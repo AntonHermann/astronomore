@@ -1,0 +1,23 @@
+[package]
+name = "astronomore"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# logging & error handling
+miette = { version = "7.6.0", features = ["fancy"] }
+tracing = "0.1.44"
+# synchronous polling of futures
+pollster = "0.4.0"
+
+# graphics
+wgpu = "29.0.3"
+winit = { version = "0.30.13", features = ["android-native-activity"] }
+
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-tracing = "2.1.0"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+miette = { version = "7.6.0", features = ["fancy"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "tracing-log"] }
