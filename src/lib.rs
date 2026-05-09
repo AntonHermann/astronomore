@@ -187,6 +187,8 @@ pub struct State {
     is_surface_configured: bool,
     window: Arc<Window>,
     render_pipeline: wgpu::RenderPipeline,
+    wireframe_pipeline: wgpu::RenderPipeline,
+    wireframe: bool,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_indices: u32,
@@ -230,7 +232,11 @@ impl State {
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,
-                required_features: wgpu::Features::empty(),
+                required_features: if cfg!(target_arch = "wasm32") {
+                    wgpu::Features::empty()
+                } else {
+                    wgpu::Features::POLYGON_MODE_LINE
+                },
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
                 // WebGL doesn't support all of wgpu's features, so if
                 // we're building for the web we'll have to disable some.
@@ -371,48 +377,61 @@ impl State {
                 ],
                 immediate_size: 0,
             });
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                buffers: &[Vertex::desc()],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                // every three vertices correspond to one triangle
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                // Ccw = triangle is facing forward if the vertices are arranged in a counter-clockwise direction
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
-                polygon_mode: wgpu::PolygonMode::Fill,
-                // Requires Features::DEPTH_CLIP_CONTROL
-                unclipped_depth: false,
-                // Requires Features::CONSERVATIVE_RASTERIZATION
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,                         // how many samples the pipeline will use
-                mask: !0,                         // which samples should be active
-                alpha_to_coverage_enabled: false, // anti-aliasing related
-            },
-            multiview_mask: None, // how many array layers the render attachments can have. We won't be rendering to array textures -> None
-            cache: None, // allows wgpu to cache shader compilation data. Only really useful for Android build targets.
-        });
+
+        let make_pipeline =
+            |polygon_mode: wgpu::PolygonMode, label: &str, fs_entry: &'static str| {
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some(label),
+                    layout: Some(&render_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &shader,
+                        entry_point: Some("vs_main"),
+                        buffers: &[Vertex::desc()],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &shader,
+                        entry_point: Some(fs_entry),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: config.format,
+                            blend: Some(wgpu::BlendState::REPLACE),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::TriangleList,
+                        strip_index_format: None,
+                        front_face: wgpu::FrontFace::Ccw,
+                        cull_mode: Some(wgpu::Face::Back),
+                        polygon_mode,
+                        unclipped_depth: false,
+                        conservative: false,
+                    },
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState {
+                        count: 1,
+                        mask: !0,
+                        alpha_to_coverage_enabled: false,
+                    },
+                    multiview_mask: None,
+                    cache: None,
+                })
+            };
+
+        let render_pipeline = make_pipeline(wgpu::PolygonMode::Fill, "Fill Pipeline", "fs_main");
+        #[cfg(not(target_arch = "wasm32"))]
+        let wireframe_pipeline = make_pipeline(
+            wgpu::PolygonMode::Line,
+            "Wireframe Pipeline",
+            "fs_wireframe",
+        );
+        #[cfg(target_arch = "wasm32")]
+        let wireframe_pipeline = make_pipeline(
+            wgpu::PolygonMode::Fill,
+            "Wireframe Pipeline",
+            "fs_wireframe",
+        );
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
@@ -435,6 +454,8 @@ impl State {
             is_surface_configured: false,
             window,
             render_pipeline,
+            wireframe_pipeline,
+            wireframe: false,
             vertex_buffer,
             index_buffer,
             num_indices,
@@ -545,7 +566,12 @@ impl State {
                 multiview_mask: None,
             });
 
-            render_pass.set_pipeline(&self.render_pipeline);
+            let pipeline = if self.wireframe {
+                &self.wireframe_pipeline
+            } else {
+                &self.render_pipeline
+            };
+            render_pass.set_pipeline(pipeline);
             render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
@@ -564,6 +590,8 @@ impl State {
     fn handle_key(&mut self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bool) {
         if code == KeyCode::Escape && is_pressed {
             event_loop.exit();
+        } else if code == KeyCode::Tab && is_pressed {
+            self.wireframe = !self.wireframe;
         } else {
             self.camera_controller.handle_key(code, is_pressed);
         }
