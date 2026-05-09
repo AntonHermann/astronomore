@@ -361,7 +361,7 @@ impl State {
 
         // ================= Render Pipeline =================
 
-        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+        let shader = device.create_shader_module(wgpu::include_wgsl!("shaders/shader.wgsl"));
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
