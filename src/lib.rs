@@ -65,25 +65,27 @@ const INDICES: &[u16] = &[
 ];
 
 struct Camera {
-    eye: cgmath::Point3<f32>,
-    target: cgmath::Point3<f32>,
-    up: cgmath::Vector3<f32>,
+    eye: glam::Vec3,
+    target: glam::Vec3,
+    up: glam::Vec3,
     aspect: f32,
     fovy: f32,
     znear: f32,
     zfar: f32,
 }
+
 #[rustfmt::skip]
-const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_cols(
-    cgmath::Vector4::new(1.0, 0.0, 0.0, 0.0),
-    cgmath::Vector4::new(0.0, 1.0, 0.0, 0.0),
-    cgmath::Vector4::new(0.0, 0.0, 0.5, 0.0),
-    cgmath::Vector4::new(0.0, 0.0, 0.5, 1.0),
+const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols(
+    glam::Vec4::new(1.0, 0.0, 0.0, 0.0),
+    glam::Vec4::new(0.0, 1.0, 0.0, 0.0),
+    glam::Vec4::new(0.0, 0.0, 0.5, 0.0),
+    glam::Vec4::new(0.0, 0.0, 0.5, 1.0),
 );
 impl Camera {
-    fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
-        let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
-        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
+    fn build_view_projection_matrix(&self) -> glam::Mat4 {
+        let view = glam::Mat4::look_at_rh(self.eye, self.target, self.up);
+        let proj =
+            glam::Mat4::perspective_rh(self.fovy.to_radians(), self.aspect, self.znear, self.zfar);
         OPENGL_TO_WGPU_MATRIX * proj * view
     }
 }
@@ -95,13 +97,12 @@ struct CameraUniform {
 }
 impl CameraUniform {
     fn new() -> Self {
-        use cgmath::SquareMatrix;
         Self {
-            view_proj: cgmath::Matrix4::identity().into(),
+            view_proj: glam::Mat4::IDENTITY.to_cols_array_2d(),
         }
     }
     fn update_view_proj(&mut self, camera: &Camera) {
-        self.view_proj = camera.build_view_projection_matrix().into();
+        self.view_proj = camera.build_view_projection_matrix().to_cols_array_2d();
     }
 }
 
@@ -147,10 +148,9 @@ impl CameraController {
     }
 
     fn update_camera(&self, camera: &mut Camera) {
-        use cgmath::InnerSpace;
         let forward = camera.target - camera.eye;
         let forward_norm = forward.normalize();
-        let forward_mag = forward.magnitude();
+        let forward_mag = forward.length();
 
         // Prevents glitching when the camera gets too close to the
         // center of the scene.
@@ -165,7 +165,7 @@ impl CameraController {
 
         // Redo radius calc in case the forward/backward is pressed.
         let forward = camera.target - camera.eye;
-        let forward_mag = forward.magnitude();
+        let forward_mag = forward.length();
 
         if self.is_right_pressed {
             // Rescale the distance between the target and the eye so
@@ -317,7 +317,7 @@ impl State {
             // have it look at the origin
             target: (0.0, 0.0, 0.0).into(),
             // which way is "up"
-            up: cgmath::Vector3::unit_y(),
+            up: glam::Vec3::Y,
             aspect: config.width as f32 / config.height as f32,
             fovy: 45.0,
             znear: 0.1,
