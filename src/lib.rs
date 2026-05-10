@@ -132,9 +132,9 @@ impl State {
             desired_maximum_frame_latency: 2,
         };
 
-        let diffuse_bytes = include_bytes!("happy-tree.png");
+        let diffuse_bytes = include_bytes!("dbg.png");
         let diffuse_texture =
-            texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png")?;
+            texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "dbg.png")?;
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
@@ -299,8 +299,11 @@ impl State {
             "fs_wireframe",
         );
 
-        let pentagon = mesh::Mesh::simple_pentagon(&device);
-        let meshes = vec![pentagon];
+        let meshes = vec![
+            mesh::Mesh::x_plane(&device),
+            mesh::Mesh::y_plane(&device),
+            mesh::Mesh::z_plane(&device),
+        ];
 
         Ok(Self {
             surface,

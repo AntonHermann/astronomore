@@ -39,6 +39,7 @@ pub struct Mesh {
     pub num_elements: u32,
 }
 
+#[allow(unused)]
 impl Mesh {
     pub fn new(device: &wgpu::Device, name: &str, vertices: &[Vertex], indices: &[u32]) -> Self {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -80,6 +81,58 @@ impl Mesh {
         ];
 
         Self::new(device, "pentagon", vertices, indices)
+    }
+
+    pub fn x_plane(device: &wgpu::Device) -> Self {
+        #[rustfmt::skip]
+        let vertices: &[Vertex] = &[
+            Vertex { position: [0., -1., -1.], tex_coords: [0.2, 0.2], }, // A
+            Vertex { position: [0.,  1., -1.], tex_coords: [0.2, 0.0], }, // B
+            Vertex { position: [0.,  1.,  1.], tex_coords: [0.0, 0.0], }, // C
+            Vertex { position: [0., -1.,  1.], tex_coords: [0.0, 0.2], }, // D
+        ];
+
+        #[rustfmt::skip]
+        let indices: &[u32] = &[
+            0, 1, 2, // ABC
+            2, 3, 0, // CDA
+        ];
+
+        Self::new(device, "x-plane", vertices, indices)
+    }
+    pub fn y_plane(device: &wgpu::Device) -> Self {
+        #[rustfmt::skip]
+        let vertices: &[Vertex] = &[
+            Vertex { position: [-1., 0., -1.], tex_coords: [0.8, 0.0], }, // A
+            Vertex { position: [ 1., 0., -1.], tex_coords: [1.0, 0.0], }, // B
+            Vertex { position: [ 1., 0.,  1.], tex_coords: [1.0, 0.2], }, // C
+            Vertex { position: [-1., 0.,  1.], tex_coords: [0.8, 0.2], }, // D
+        ];
+
+        #[rustfmt::skip]
+        let indices: &[u32] = &[
+            0, 2, 1, // ACB
+            2, 0, 3, // CDA
+        ];
+
+        Self::new(device, "y-plane", vertices, indices)
+    }
+    pub fn z_plane(device: &wgpu::Device) -> Self {
+        #[rustfmt::skip]
+        let vertices: &[Vertex] = &[
+            Vertex { position: [-1., -1., 0.], tex_coords: [0.8, 1.0], }, // A
+            Vertex { position: [ 1., -1., 0.], tex_coords: [1.0, 1.0], }, // B
+            Vertex { position: [ 1.,  1., 0.], tex_coords: [1.0, 0.8], }, // C
+            Vertex { position: [-1.,  1., 0.], tex_coords: [0.8, 0.8], }, // D
+        ];
+
+        #[rustfmt::skip]
+        let indices: &[u32] = &[
+            0, 1, 2, // ABC
+            2, 3, 0, // CDA
+        ];
+
+        Self::new(device, "z-plane", vertices, indices)
     }
 }
 
