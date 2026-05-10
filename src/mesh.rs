@@ -83,6 +83,169 @@ impl Mesh {
         Self::new(device, "pentagon", vertices, indices)
     }
 
+    pub fn sphere(device: &wgpu::Device) -> Self {
+        use std::f32::consts::PI;
+        const FULL_CIRCLE: f32 = 2. * PI;
+        const HALF_CIRCLE: f32 = PI;
+
+        let num_meridians = 8u32;
+        let num_parallels = 7u32;
+
+        let lon_step = FULL_CIRCLE / num_meridians as f32;
+        let lat_step = HALF_CIRCLE / (num_parallels + 1) as f32;
+        println!(
+            "lon step: {lon_step_deg}°",
+            lon_step_deg = lon_step.to_degrees()
+        );
+        println!(
+            "lat step: {lat_step_deg}°",
+            lat_step_deg = lat_step.to_degrees()
+        );
+
+        let mut vertices: Vec<Vertex> =
+            Vec::with_capacity(2 + (num_meridians * num_parallels) as usize);
+        let mut indices: Vec<[u32; 3]> =
+            Vec::with_capacity((num_meridians * num_parallels) as usize * 2);
+        println!(
+            "#vertices: {}, #triangles: {}",
+            vertices.capacity(),
+            indices.capacity()
+        );
+
+        // add top vertex (north pole)
+        vertices.push(Vertex {
+            position: [0., 1., 0.],
+            tex_coords: [0.5, 0.],
+        });
+        println!(
+            "top -> v{:<2} = [{vx:4.1} {vy:4.1} {vz:4.1}]",
+            vertices.len() - 1,
+            vx = vertices.last().unwrap().position[0],
+            vy = vertices.last().unwrap().position[1],
+            vz = vertices.last().unwrap().position[2]
+        );
+
+        let lat_top = HALF_CIRCLE / 2. - lat_step;
+        println!(
+            "lat top: {lat_deg}° (parallel 1 / {num_parallels})",
+            lat_deg = lat_top.to_degrees()
+        );
+        for meridian_i in 0..num_meridians {
+            let lon = lon_step * meridian_i as f32;
+            print!(
+                "  lon: {lon_deg:>5.1}° -> uv: {uv_x:<5.3}, {uv_y:<5.3}",
+                lon_deg = lon.to_degrees(),
+                uv_x = lon / FULL_CIRCLE,
+                uv_y = 1. / (num_parallels + 1) as f32
+            );
+
+            vertices.push(Vertex {
+                position: [
+                    lat_top.cos() * lon.cos(),
+                    lat_top.sin(),
+                    lat_top.cos() * lon.sin(),
+                ],
+                tex_coords: [lon / FULL_CIRCLE, 1. / (num_parallels + 1) as f32],
+            });
+            println!(
+                " -> v{:<2} = [{vx:4.1} {vy:4.1} {vz:4.1}]",
+                vertices.len() - 1,
+                vx = vertices.last().unwrap().position[0],
+                vy = vertices.last().unwrap().position[1],
+                vz = vertices.last().unwrap().position[2]
+            );
+            // indices.extend_from_slice(&[0, meridian_i + 1, (meridian_i + 1) % num_meridians + 1]);
+            indices.push([0, (meridian_i + 1) % num_meridians + 1, meridian_i + 1]);
+        }
+
+        println!("---");
+        for parallel_i in 2..=num_parallels {
+            let lat = HALF_CIRCLE / 2. - lat_step * parallel_i as f32;
+            println!(
+                "lat: {lat_deg:.1}° (parallel {parallel_i} / {num_parallels})",
+                lat_deg = 90. - (lat_step * parallel_i as f32).to_degrees()
+            );
+
+            for meridian_i in 0..num_meridians {
+                let lon = lon_step * meridian_i as f32;
+                print!(
+                    "  lon: {lon_deg:>5.1}° -> uv: {uv_x:<5.3}, {uv_y:<5.3}",
+                    lon_deg = lon.to_degrees(),
+                    uv_x = lon / FULL_CIRCLE,
+                    uv_y = lat / HALF_CIRCLE + 0.5
+                );
+
+                vertices.push(Vertex {
+                    position: [lat.cos() * lon.cos(), lat.sin(), lat.cos() * lon.sin()],
+                    tex_coords: [lon / FULL_CIRCLE, 0.5 - lat / HALF_CIRCLE],
+                });
+                println!(
+                    " -> v{:<2} = [{vx:4.1} {vy:4.1} {vz:4.1}]",
+                    vertices.len() - 1,
+                    vx = vertices.last().unwrap().position[0],
+                    vy = vertices.last().unwrap().position[1],
+                    vz = vertices.last().unwrap().position[2]
+                );
+
+                // X--X  <- parallel_i-1 (s_prev)
+                // |1/|
+                // |/2|
+                // X--X  <- parallel_i   (s_curr)
+                //
+                // ^  ^
+                // i i+1
+                let s_prev = (parallel_i - 2) * num_meridians + 1; // start of previous parallel
+                let s_curr = (parallel_i - 1) * num_meridians + 1; // start of current parallel
+                let i = meridian_i;
+                indices.extend(&[
+                    [s_prev + i, s_prev + (i + 1) % num_meridians, s_curr + i], // 1
+                    [
+                        s_prev + (i + 1) % num_meridians,
+                        s_curr + (i + 1) % num_meridians,
+                        s_curr + i,
+                    ], // 2
+                ]);
+            }
+        }
+
+        // add bottom vertex (south pole)
+        vertices.push(Vertex {
+            position: [0., -1., 0.],
+            tex_coords: [0.5, 1.],
+        });
+        println!(
+            "bottom -> v{:<2} = [{vx:4.1} {vy:4.1} {vz:4.1}]",
+            vertices.len() - 1,
+            vx = vertices.last().unwrap().position[0],
+            vy = vertices.last().unwrap().position[1],
+            vz = vertices.last().unwrap().position[2]
+        );
+
+        let s_bottom = (num_parallels - 1) * num_meridians + 1; // start of last parallel
+        let i_south = vertices.len() as u32 - 1;
+        for meridian_i in 0..num_meridians {
+            // indices.extend_from_slice(&[s_bottom + meridian_i, i_south_pole, s_bottom + (meridian_i + 1) % num_meridians]);
+            indices.push([
+                s_bottom + meridian_i,
+                s_bottom + (meridian_i + 1) % num_meridians,
+                i_south,
+            ]);
+        }
+
+        // println!("vertices ({}):", vertices.len());
+        // for (i,v) in vertices.iter().enumerate() {
+        //     println!("  {i:2} : [{vx:4.1} {vy:4.1} {vz:4.1}]", vx = v.position[0], vy = v.position[1], vz = v.position[2]);
+        // }
+        println!("indices ({} triangles):", indices.len());
+        // for (i, ii) in indices.chunks(3).enumerate() {
+        for (i, ii) in indices.iter().enumerate() {
+            println!("  {i:2} : {ii:?}");
+        }
+
+        let indices: Vec<u32> = indices.iter().flat_map(|tri| tri.to_vec()).collect();
+        Self::new(device, "sphere", &vertices, &indices)
+    }
+
     pub fn x_plane(device: &wgpu::Device) -> Self {
         #[rustfmt::skip]
         let vertices: &[Vertex] = &[
