@@ -1,3 +1,4 @@
+mod camera;
 mod mesh;
 mod texture;
 
@@ -20,32 +21,6 @@ use winit::platform::web::EventLoopExtWebSys;
 
 use crate::mesh::{DrawMesh, Vertex};
 
-struct Camera {
-    eye: glam::Vec3,
-    target: glam::Vec3,
-    up: glam::Vec3,
-    aspect: f32,
-    fovy: f32,
-    znear: f32,
-    zfar: f32,
-}
-
-#[rustfmt::skip]
-const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols(
-    glam::Vec4::new(1.0, 0.0, 0.0, 0.0),
-    glam::Vec4::new(0.0, 1.0, 0.0, 0.0),
-    glam::Vec4::new(0.0, 0.0, 0.5, 0.0),
-    glam::Vec4::new(0.0, 0.0, 0.5, 1.0),
-);
-impl Camera {
-    fn build_view_projection_matrix(&self) -> glam::Mat4 {
-        let view = glam::Mat4::look_at_rh(self.eye, self.target, self.up);
-        let proj =
-            glam::Mat4::perspective_rh(self.fovy.to_radians(), self.aspect, self.znear, self.zfar);
-        OPENGL_TO_WGPU_MATRIX * proj * view
-    }
-}
-
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct CameraUniform {
@@ -57,81 +32,8 @@ impl CameraUniform {
             view_proj: glam::Mat4::IDENTITY.to_cols_array_2d(),
         }
     }
-    fn update_view_proj(&mut self, camera: &Camera) {
-        self.view_proj = camera.build_view_projection_matrix().to_cols_array_2d();
-    }
-}
-
-struct CameraController {
-    speed: f32,
-    is_forward_pressed: bool,
-    is_backward_pressed: bool,
-    is_left_pressed: bool,
-    is_right_pressed: bool,
-}
-
-impl CameraController {
-    fn new(speed: f32) -> Self {
-        Self {
-            speed,
-            is_forward_pressed: false,
-            is_backward_pressed: false,
-            is_left_pressed: false,
-            is_right_pressed: false,
-        }
-    }
-
-    fn handle_key(&mut self, code: KeyCode, is_pressed: bool) -> bool {
-        match code {
-            KeyCode::KeyW | KeyCode::ArrowUp => {
-                self.is_forward_pressed = is_pressed;
-                true
-            }
-            KeyCode::KeyA | KeyCode::ArrowLeft => {
-                self.is_left_pressed = is_pressed;
-                true
-            }
-            KeyCode::KeyS | KeyCode::ArrowDown => {
-                self.is_backward_pressed = is_pressed;
-                true
-            }
-            KeyCode::KeyD | KeyCode::ArrowRight => {
-                self.is_right_pressed = is_pressed;
-                true
-            }
-            _ => false,
-        }
-    }
-
-    fn update_camera(&self, camera: &mut Camera) {
-        let forward = camera.target - camera.eye;
-        let forward_norm = forward.normalize();
-        let forward_mag = forward.length();
-
-        // Prevents glitching when the camera gets too close to the
-        // center of the scene.
-        if self.is_forward_pressed && forward_mag > self.speed {
-            camera.eye += forward_norm * self.speed;
-        }
-        if self.is_backward_pressed {
-            camera.eye -= forward_norm * self.speed;
-        }
-
-        let right = forward_norm.cross(camera.up);
-
-        // Redo radius calc in case the forward/backward is pressed.
-        let forward = camera.target - camera.eye;
-        let forward_mag = forward.length();
-
-        if self.is_right_pressed {
-            // Rescale the distance between the target and the eye so
-            // that it doesn't change. The eye, therefore, still
-            // lies on the circle made by the target and eye.
-            camera.eye = camera.target - (forward + right * self.speed).normalize() * forward_mag;
-        }
-        if self.is_left_pressed {
-            camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
-        }
+    fn update_view_proj(&mut self, camera: &camera::Camera, projection: &camera::Projection) {
+        self.view_proj = (projection.calc_matrix() * camera.calc_matrix()).to_cols_array_2d();
     }
 }
 
@@ -142,17 +44,20 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     is_surface_configured: bool,
     window: Arc<Window>,
+    last_update: std::time::Instant,
     render_pipeline: wgpu::RenderPipeline,
     wireframe_pipeline: wgpu::RenderPipeline,
     wireframe: bool,
     meshes: Vec<mesh::Mesh>,
     diffuse_bind_group: wgpu::BindGroup,
     // diffuse_texture: texture::Texture,
-    camera: Camera,
+    camera: camera::Camera,
+    projection: camera::Projection,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
-    camera_controller: CameraController,
+    camera_controller: camera::FpsCameraController,
+    mouse_pressed: bool,
     depth_texture: texture::Texture,
 }
 
@@ -271,22 +176,13 @@ impl State {
 
         // ======= Camera setup =======
 
-        let camera = Camera {
-            // position the camera 1 unit up and 2 units back
-            // +z is out of the screen
-            eye: (0.0, 1.0, 2.0).into(),
-            // have it look at the origin
-            target: (0.0, 0.0, 0.0).into(),
-            // which way is "up"
-            up: glam::Vec3::Y,
-            aspect: config.width as f32 / config.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
-        };
+        let camera =
+            camera::Camera::new_fps((0.0, 5.0, 10.0), -90f32.to_radians(), -20f32.to_radians());
+        let projection =
+            camera::Projection::new(size.width, size.height, 45.0f32.to_radians(), 0.1, 100.0);
 
         let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update_view_proj(&camera);
+        camera_uniform.update_view_proj(&camera, &projection);
 
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
@@ -318,7 +214,7 @@ impl State {
             label: Some("Camera Bind Group"),
         });
 
-        let camera_controller = CameraController::new(0.05);
+        let camera_controller = camera::FpsCameraController::new(4.0, 2.0);
 
         // ================= Depth Texture setup =================
         let depth_texture =
@@ -413,6 +309,7 @@ impl State {
             config,
             is_surface_configured: false,
             window,
+            last_update: std::time::Instant::now(),
             render_pipeline,
             wireframe_pipeline,
             wireframe: false,
@@ -420,10 +317,12 @@ impl State {
             diffuse_bind_group,
             // diffuse_texture,
             camera,
+            projection,
             camera_uniform,
             camera_buffer,
             camera_bind_group,
             camera_controller,
+            mouse_pressed: false,
             depth_texture,
         })
     }
@@ -435,13 +334,17 @@ impl State {
             self.surface.configure(&self.device, &self.config);
             self.depth_texture =
                 texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
-            self.camera.aspect = width as f32 / height as f32;
+            self.projection.resize(width, height);
             self.is_surface_configured = true;
         }
     }
 
     /// Update application state before rendering
     pub fn update(&mut self) {
+        let now = std::time::Instant::now();
+        let dt = now - self.last_update;
+        self.last_update = now;
+
         // Alternatives for updating the camera:
         // 1. We can create a separate buffer and copy its contents to our camera_buffer
         //    The new buffer is known as a staging buffer.
@@ -455,8 +358,10 @@ impl State {
         //    We won't talk about it here, but check out the Wgpu without a window tutorial if you want to know more.
         // 3. We can use write_buffer on queue.
         // --> we chose 3. src: https://sotrh.github.io/learn-wgpu/beginner/tutorial6-uniforms/#demo
-        self.camera_controller.update_camera(&mut self.camera);
-        self.camera_uniform.update_view_proj(&self.camera);
+        let camera::Camera::Fps(camera) = &mut self.camera;
+        self.camera_controller.update_camera(camera, dt);
+        self.camera_uniform
+            .update_view_proj(&self.camera, &self.projection);
         self.queue.write_buffer(
             &self.camera_buffer,
             0,
@@ -555,13 +460,13 @@ impl State {
         Ok(())
     }
 
-    fn handle_key(&mut self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bool) {
-        if code == KeyCode::Escape && is_pressed {
+    fn handle_key(&mut self, event_loop: &ActiveEventLoop, code: KeyCode, state: ElementState) {
+        if code == KeyCode::Escape && state.is_pressed() {
             event_loop.exit();
-        } else if code == KeyCode::Tab && is_pressed {
+        } else if code == KeyCode::Tab && state.is_pressed() {
             self.wireframe = !self.wireframe;
         } else {
-            self.camera_controller.handle_key(code, is_pressed);
+            self.camera_controller.handle_key(code, state);
         }
     }
 }
@@ -648,6 +553,21 @@ impl ApplicationHandler<State> for App {
         self.state = Some(event);
     }
 
+    fn device_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _device_id: DeviceId,
+        event: DeviceEvent,
+    ) {
+        if let DeviceEvent::MouseMotion { delta } = event
+            && let Some(state) = &mut self.state
+            && state.mouse_pressed
+        {
+            let (mouse_dx, mouse_dy) = delta;
+            state.camera_controller.handle_mouse(mouse_dx, mouse_dy);
+        }
+    }
+
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
@@ -680,7 +600,15 @@ impl ApplicationHandler<State> for App {
                         ..
                     },
                 ..
-            } => state.handle_key(event_loop, code, key_state.is_pressed()),
+            } => state.handle_key(event_loop, code, key_state),
+            WindowEvent::MouseWheel { delta, .. } => {
+                state.camera_controller.handle_mouse_scroll(&delta)
+            }
+            WindowEvent::MouseInput {
+                state: mouse_state,
+                button: MouseButton::Left,
+                ..
+            } => state.mouse_pressed = mouse_state.is_pressed(),
             _ => {}
         }
     }

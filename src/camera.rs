@@ -1,0 +1,196 @@
+use std::f32::consts::FRAC_PI_2;
+use std::time::Duration;
+use winit::dpi::PhysicalPosition;
+use winit::event::*;
+use winit::keyboard::KeyCode;
+
+#[rustfmt::skip]
+const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols(
+    glam::Vec4::new(1.0, 0.0, 0.0, 0.0),
+    glam::Vec4::new(0.0, 1.0, 0.0, 0.0),
+    glam::Vec4::new(0.0, 0.0, 0.5, 0.0),
+    glam::Vec4::new(0.0, 0.0, 0.5, 1.0),
+);
+const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
+
+pub enum Camera {
+    Fps(FpsCamera),
+}
+impl Camera {
+    pub fn new_fps(position: impl Into<glam::Vec3>, yaw_rad: f32, pitch_rad: f32) -> Self {
+        Self::Fps(FpsCamera::new(position, yaw_rad, pitch_rad))
+    }
+    pub fn calc_matrix(&self) -> glam::Mat4 {
+        match self {
+            Camera::Fps(camera) => camera.calc_matrix(),
+        }
+    }
+}
+
+pub struct FpsCamera {
+    pub position: glam::Vec3,
+    /// Rotation (in radians) around the vertical axis (y-axis)
+    yaw_rad: f32,
+    /// Rotation (in radians) around the horizontal axis (x-axis)
+    pitch_rad: f32,
+}
+
+impl FpsCamera {
+    pub fn new(position: impl Into<glam::Vec3>, yaw_rad: f32, pitch_rad: f32) -> Self {
+        Self {
+            position: position.into(),
+            yaw_rad,
+            pitch_rad,
+        }
+    }
+    pub fn calc_matrix(&self) -> glam::Mat4 {
+        let (sin_pitch, cos_pitch) = self.pitch_rad.sin_cos();
+        let (sin_yaw, cos_yaw) = self.yaw_rad.sin_cos();
+        glam::Mat4::look_to_rh(
+            self.position,
+            glam::Vec3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw).normalize(),
+            glam::Vec3::Y,
+        )
+    }
+}
+
+pub struct Projection {
+    aspect_ratio: f32,
+    fov_y_rad: f32,
+    z_near: f32,
+    z_far: f32,
+}
+impl Projection {
+    pub fn new(width: u32, height: u32, fov_y_rad: f32, z_near: f32, z_far: f32) -> Self {
+        let aspect_ratio = width as f32 / height as f32;
+        Self {
+            aspect_ratio,
+            fov_y_rad,
+            z_near,
+            z_far,
+        }
+    }
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.aspect_ratio = width as f32 / height as f32;
+    }
+
+    pub fn calc_matrix(&self) -> glam::Mat4 {
+        OPENGL_TO_WGPU_MATRIX
+            * glam::Mat4::perspective_rh(self.fov_y_rad, self.aspect_ratio, self.z_near, self.z_far)
+    }
+}
+
+#[derive(Debug)]
+pub struct FpsCameraController {
+    amount_left: f32,
+    amount_right: f32,
+    amount_forward: f32,
+    amount_backward: f32,
+    amount_up: f32,
+    amount_down: f32,
+    rotate_horizontal: f32,
+    rotate_vertical: f32,
+    scroll: f32,
+    speed: f32,
+    sensitivity: f32,
+}
+
+impl FpsCameraController {
+    pub fn new(speed: f32, sensitivity: f32) -> Self {
+        Self {
+            amount_left: 0.0,
+            amount_right: 0.0,
+            amount_forward: 0.0,
+            amount_backward: 0.0,
+            amount_up: 0.0,
+            amount_down: 0.0,
+            rotate_horizontal: 0.0,
+            rotate_vertical: 0.0,
+            scroll: 0.0,
+            speed,
+            sensitivity,
+        }
+    }
+
+    pub fn handle_key(&mut self, key: KeyCode, state: ElementState) -> bool {
+        let amount = if state.is_pressed() { 1.0 } else { 0.0 };
+        match key {
+            KeyCode::KeyW | KeyCode::ArrowUp => {
+                self.amount_forward = amount;
+                true
+            }
+            KeyCode::KeyS | KeyCode::ArrowDown => {
+                self.amount_backward = amount;
+                true
+            }
+            KeyCode::KeyA | KeyCode::ArrowLeft => {
+                self.amount_left = amount;
+                true
+            }
+            KeyCode::KeyD | KeyCode::ArrowRight => {
+                self.amount_right = amount;
+                true
+            }
+            KeyCode::Space => {
+                self.amount_up = amount;
+                true
+            }
+            KeyCode::ShiftLeft => {
+                self.amount_down = amount;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    pub fn handle_mouse(&mut self, mouse_dx: f64, mouse_dy: f64) {
+        self.rotate_horizontal = mouse_dx as f32;
+        self.rotate_vertical = mouse_dy as f32;
+    }
+
+    pub fn handle_mouse_scroll(&mut self, delta: &MouseScrollDelta) {
+        self.scroll = -match delta {
+            // I'm assuming a line is about 100 pixels
+            MouseScrollDelta::LineDelta(_, scroll) => scroll * 100.0,
+            MouseScrollDelta::PixelDelta(PhysicalPosition { y: scroll, .. }) => *scroll as f32,
+        };
+    }
+
+    pub fn update_camera(&mut self, camera: &mut FpsCamera, dt: Duration) {
+        let dt = dt.as_secs_f32();
+
+        // Move forward/backward and left/right
+        let (yaw_sin, yaw_cos) = camera.yaw_rad.sin_cos();
+        let forward = glam::Vec3::new(yaw_cos, 0.0, yaw_sin).normalize();
+        let right = glam::Vec3::new(-yaw_sin, 0.0, yaw_cos).normalize();
+        camera.position += forward * (self.amount_forward - self.amount_backward) * self.speed * dt;
+        camera.position += right * (self.amount_right - self.amount_left) * self.speed * dt;
+
+        // Move in/out (aka. "zoom")
+        // Note: this isn't an actual zoom. The camera's position
+        // changes when zooming. I've added this to make it easier
+        // to get closer to an object you want to focus on.
+        let (pitch_sin, pitch_cos) = camera.pitch_rad.sin_cos();
+        let scrollward =
+            glam::Vec3::new(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin).normalize();
+        camera.position += scrollward * self.scroll * self.speed * self.sensitivity * dt;
+        self.scroll = 0.0;
+
+        // Move up/down. Since we don't use roll, we can just
+        // modify the y coordinate directly.
+        camera.position.y += (self.amount_up - self.amount_down) * self.speed * dt;
+
+        // Rotate
+        camera.yaw_rad += self.rotate_horizontal * self.sensitivity * dt;
+        camera.pitch_rad += -self.rotate_vertical * self.sensitivity * dt;
+
+        // If process_mouse isn't called every frame, these values
+        // will not get set to zero, and the camera will rotate
+        // when moving in a non-cardinal direction.
+        self.rotate_horizontal = 0.0;
+        self.rotate_vertical = 0.0;
+
+        // Keep the camera's angle from going too high/low.
+        camera.pitch_rad = camera.pitch_rad.clamp(-SAFE_FRAC_PI_2, SAFE_FRAC_PI_2);
+    }
+}
