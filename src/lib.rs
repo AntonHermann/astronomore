@@ -301,9 +301,9 @@ impl State {
 
         let meshes = vec![
             mesh::Mesh::sphere2(&device),
-            mesh::Mesh::x_plane(&device),
-            mesh::Mesh::y_plane(&device),
-            mesh::Mesh::z_plane(&device),
+            // mesh::Mesh::x_plane(&device),
+            // mesh::Mesh::y_plane(&device),
+            // mesh::Mesh::z_plane(&device),
         ];
 
         Ok(Self {

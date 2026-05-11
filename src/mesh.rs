@@ -280,10 +280,6 @@ impl Mesh {
         for parallel_i in 0..=num_parallels {
             // lat: [90°, -90°] = [PI/2, -PI/2]
             let lat = PI / 2. - lat_step * parallel_i as f32;
-            println!(
-                "lat: {lat_deg:.1}° (parallel {parallel_i} / {num_parallels})",
-                lat_deg = 90. - (lat_step * parallel_i as f32).to_degrees()
-            );
 
             for meridian_i in 0..=num_meridians {
                 let lon = lon_step * meridian_i as f32;
@@ -292,18 +288,11 @@ impl Mesh {
                     position: [lat.cos() * lon.cos(), lat.sin(), lat.cos() * lon.sin()],
                     tex_coords: [lon / (2. * PI), 0.5 - lat / PI],
                 });
-                println!(
-                    "  lon: {:>5.1}° -> v{:<2} = {}",
-                    lon.to_degrees(),
-                    vertices.len() - 1,
-                    vertices.last().unwrap()
-                );
             }
         }
 
         // Indices
         for parallel_i in 0..num_parallels {
-            println!("parallel {parallel_i} / {num_parallels}");
             for meridian_i in 0..num_meridians {
                 // X--X  <- parallel_i   (s_curr)
                 // |1/|
@@ -318,11 +307,6 @@ impl Mesh {
                     [s_curr + i, s_curr + i + 1, s_next + i],     // 1
                     [s_curr + i + 1, s_next + i + 1, s_next + i], // 2
                 ]);
-                #[rustfmt::skip]
-                println!("  indices: [{}, {}, {}], [{}, {}, {}]",
-                    s_curr + i, s_curr + i + 1, s_next + i,
-                    s_curr + i + 1, s_next + i + 1, s_next + i
-                );
             }
         }
 
