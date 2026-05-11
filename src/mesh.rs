@@ -30,6 +30,19 @@ impl Vertex {
         }
     }
 }
+impl std::fmt::Display for Vertex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "pos: [{:4.1} {:4.1} {:4.1}], uv: [{:4.3} {:4.3}]",
+            self.position[0],
+            self.position[1],
+            self.position[2],
+            self.tex_coords[0],
+            self.tex_coords[1]
+        )
+    }
+}
 
 pub struct Mesh {
     #[allow(dead_code)]
