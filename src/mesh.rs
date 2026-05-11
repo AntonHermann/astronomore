@@ -259,6 +259,77 @@ impl Mesh {
         Self::new(device, "sphere", &vertices, &indices)
     }
 
+    pub fn sphere2(device: &wgpu::Device) -> Self {
+        use std::f32::consts::PI;
+
+        let num_meridians = 32u32;
+        let num_parallels = 16u32;
+
+        let lon_step = 2. * PI / num_meridians as f32;
+        let lat_step = PI / num_parallels as f32;
+
+        let mut vertices: Vec<Vertex> =
+            Vec::with_capacity(((num_meridians + 1) * (num_parallels + 1)) as usize);
+        let mut indices: Vec<[u32; 3]> =
+            Vec::with_capacity((num_meridians * num_parallels) as usize * 2);
+
+        // Vertices
+        // in order to have correct texture coordinates:
+        // - the top and bottom vertices are not generated separately, but `num_meridians + 1` x times at lat = 90° and lat = -90° respectively
+        // - the last vertex of each parallel is the same as the first one (lon = 360° = 0°)
+        for parallel_i in 0..=num_parallels {
+            // lat: [90°, -90°] = [PI/2, -PI/2]
+            let lat = PI / 2. - lat_step * parallel_i as f32;
+            println!(
+                "lat: {lat_deg:.1}° (parallel {parallel_i} / {num_parallels})",
+                lat_deg = 90. - (lat_step * parallel_i as f32).to_degrees()
+            );
+
+            for meridian_i in 0..=num_meridians {
+                let lon = lon_step * meridian_i as f32;
+
+                vertices.push(Vertex {
+                    position: [lat.cos() * lon.cos(), lat.sin(), lat.cos() * lon.sin()],
+                    tex_coords: [lon / (2. * PI), 0.5 - lat / PI],
+                });
+                println!(
+                    "  lon: {:>5.1}° -> v{:<2} = {}",
+                    lon.to_degrees(),
+                    vertices.len() - 1,
+                    vertices.last().unwrap()
+                );
+            }
+        }
+
+        // Indices
+        for parallel_i in 0..num_parallels {
+            println!("parallel {parallel_i} / {num_parallels}");
+            for meridian_i in 0..num_meridians {
+                // X--X  <- parallel_i   (s_curr)
+                // |1/|
+                // |/2|
+                // X--X  <- parallel_i+1 (s_next)
+                // ^  ^
+                // i i+1
+                let s_curr = parallel_i * (num_meridians + 1); // start of current parallel
+                let s_next = s_curr + num_meridians + 1; // start of next parallel
+                let i = meridian_i;
+                indices.extend(&[
+                    [s_curr + i, s_curr + i + 1, s_next + i],     // 1
+                    [s_curr + i + 1, s_next + i + 1, s_next + i], // 2
+                ]);
+                #[rustfmt::skip]
+                println!("  indices: [{}, {}, {}], [{}, {}, {}]",
+                    s_curr + i, s_curr + i + 1, s_next + i,
+                    s_curr + i + 1, s_next + i + 1, s_next + i
+                );
+            }
+        }
+
+        let indices: Vec<u32> = indices.iter().flat_map(|tri| tri.to_vec()).collect();
+        Self::new(device, "sphere2", &vertices, &indices)
+    }
+
     pub fn x_plane(device: &wgpu::Device) -> Self {
         #[rustfmt::skip]
         let vertices: &[Vertex] = &[
