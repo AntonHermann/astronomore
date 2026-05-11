@@ -1,11 +1,12 @@
 use image::GenericImageView;
 use miette::IntoDiagnostic;
 
+#[allow(dead_code)]
 pub struct Texture {
-    #[allow(dead_code)]
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
+    pub bind_group: Option<wgpu::BindGroup>,
 }
 
 impl Texture {
@@ -14,16 +15,18 @@ impl Texture {
         queue: &wgpu::Queue,
         bytes: &[u8],
         label: &str,
+        bind_group_layout: &wgpu::BindGroupLayout,
     ) -> miette::Result<Self> {
         let img = image::load_from_memory(bytes).into_diagnostic()?;
-        Self::from_image(device, queue, &img, Some(label))
+        Self::from_image(device, queue, &img, label, bind_group_layout)
     }
 
     pub fn from_image(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         img: &image::DynamicImage,
-        label: Option<&str>,
+        label: &str,
+        bind_group_layout: &wgpu::BindGroupLayout,
     ) -> miette::Result<Self> {
         let img_rgba = img.to_rgba8();
         let dimensions = img.dimensions();
@@ -35,7 +38,7 @@ impl Texture {
             depth_or_array_layers: 1,
         };
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label,
+            label: Some(label),
             size: texture_size,
             mip_level_count: 1, // We'll talk about this a little later
             sample_count: 1,
@@ -78,10 +81,26 @@ impl Texture {
             ..Default::default()
         });
 
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+            label: Some(&format!("{label}_bind_group")),
+        });
+
         Ok(Self {
             texture,
             view,
             sampler,
+            bind_group: Some(bind_group),
         })
     }
 }
@@ -137,6 +156,7 @@ impl Texture {
             texture,
             view,
             sampler,
+            bind_group: None,
         }
     }
 }

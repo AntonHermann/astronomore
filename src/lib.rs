@@ -49,8 +49,8 @@ pub struct State {
     wireframe_pipeline: wgpu::RenderPipeline,
     wireframe: bool,
     meshes: Vec<mesh::Mesh>,
-    diffuse_bind_group: wgpu::BindGroup,
-    // diffuse_texture: texture::Texture,
+    diffuse_texture: texture::Texture,
+    // diffuse_bind_group: wgpu::BindGroup,
     camera: camera::Camera,
     projection: camera::Projection,
     camera_uniform: CameraUniform,
@@ -132,9 +132,6 @@ impl State {
             desired_maximum_frame_latency: 2,
         };
 
-        let diffuse_bytes = include_bytes!("dbg.png");
-        let diffuse_texture =
-            texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "dbg.png")?;
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
@@ -159,20 +156,14 @@ impl State {
                 ],
                 label: Some("texture_bind_group_layout"),
             });
-        let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &texture_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
-                },
-            ],
-            label: Some("diffuse_bind_group"),
-        });
+        let diffuse_bytes = include_bytes!("dbg.png");
+        let diffuse_texture = texture::Texture::from_bytes(
+            &device,
+            &queue,
+            diffuse_bytes,
+            "dbg.png",
+            &texture_bind_group_layout,
+        )?;
 
         // ======= Camera setup =======
 
@@ -318,8 +309,7 @@ impl State {
             wireframe_pipeline,
             wireframe: false,
             meshes,
-            diffuse_bind_group,
-            // diffuse_texture,
+            diffuse_texture,
             camera,
             projection,
             camera_uniform,
@@ -449,7 +439,7 @@ impl State {
                 &self.render_pipeline
             };
             render_pass.set_pipeline(pipeline);
-            render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
+            render_pass.set_bind_group(0, &self.diffuse_texture.bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
 
             for mesh in &self.meshes {
