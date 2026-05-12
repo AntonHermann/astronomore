@@ -123,7 +123,7 @@ impl Mesh {
 
                 vertices.push(Vertex {
                     position: [lat.cos() * lon.cos(), lat.sin(), lat.cos() * lon.sin()],
-                    tex_coords: [lon / (2. * PI), 0.5 - lat / PI],
+                    tex_coords: [1.0 - lon / (2. * PI), 0.5 - lat / PI],
                 });
             }
         }
