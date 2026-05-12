@@ -96,11 +96,11 @@ impl Mesh {
         Self::new(device, "pentagon", vertices, indices)
     }
 
-    pub fn sphere(device: &wgpu::Device) -> Self {
+    pub fn default_sphere(device: &wgpu::Device) -> Self {
+        Self::sphere(device, 32, 16)
+    }
+    pub fn sphere(device: &wgpu::Device, num_meridians: u32, num_parallels: u32) -> Self {
         use std::f32::consts::PI;
-
-        let num_meridians = 32u32;
-        let num_parallels = 16u32;
 
         let lon_step = 2. * PI / num_meridians as f32;
         let lat_step = PI / num_parallels as f32;
