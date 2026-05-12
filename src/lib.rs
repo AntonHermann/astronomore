@@ -1,4 +1,5 @@
 mod camera;
+mod celestial_body;
 mod mesh;
 mod texture;
 
@@ -19,6 +20,7 @@ use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::EventLoopExtWebSys;
 
+use crate::celestial_body::{CelestialBody, DrawCelestialBody};
 use crate::mesh::{DrawMesh, Vertex};
 
 #[repr(C)]
@@ -51,6 +53,7 @@ pub struct State {
     meshes: Vec<mesh::Mesh>,
     diffuse_texture: texture::Texture,
     // diffuse_bind_group: wgpu::BindGroup,
+    planets: Vec<CelestialBody>,
     camera: camera::Camera,
     projection: camera::Projection,
     camera_uniform: CameraUniform,
@@ -162,6 +165,14 @@ impl State {
             &queue,
             diffuse_bytes,
             "dbg.png",
+            &texture_bind_group_layout,
+        )?;
+        let earth_bytes = include_bytes!("textures/2k_earth_daymap.jpg");
+        let earth_texture = texture::Texture::from_bytes(
+            &device,
+            &queue,
+            earth_bytes,
+            "earth.jpg",
             &texture_bind_group_layout,
         )?;
 
@@ -290,8 +301,10 @@ impl State {
             "fs_wireframe",
         );
 
+        let planets = vec![CelestialBody::new(&device, "Earth", earth_texture)];
+
         let meshes = vec![
-            mesh::Mesh::default_sphere(&device),
+            // mesh::Mesh::default_sphere(&device),
             // mesh::Mesh::x_plane(&device),
             // mesh::Mesh::y_plane(&device),
             // mesh::Mesh::z_plane(&device),
@@ -310,6 +323,7 @@ impl State {
             wireframe: false,
             meshes,
             diffuse_texture,
+            planets,
             camera,
             projection,
             camera_uniform,
@@ -444,6 +458,10 @@ impl State {
 
             for mesh in &self.meshes {
                 render_pass.draw_mesh(mesh);
+            }
+
+            for planet in &self.planets {
+                render_pass.draw_celestial_body(planet, &self.camera_bind_group);
             }
         }
 
