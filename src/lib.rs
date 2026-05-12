@@ -81,8 +81,10 @@ impl State {
             display: None,
         });
 
+        // part of the window that we draw to
         let surface = instance.create_surface(window.clone()).into_diagnostic()?;
 
+        // handle to the actual graphics card, locked to specific backend
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
@@ -113,6 +115,17 @@ impl State {
             })
             .await
             .into_diagnostic()?;
+
+        let adapter_info = adapter.get_info();
+        tracing::info!(
+            "Using adapter: {} ({:?})",
+            adapter_info.name,
+            adapter_info.device_type
+        );
+        tracing::info!("Backend: {}", adapter_info.backend);
+        tracing::trace!("Adapter features: {:#?}", adapter.features());
+        tracing::debug!("Device features: {:#?}", device.features());
+        tracing::trace!("Device limits: {:#?}", device.limits());
 
         let surface_caps = surface.get_capabilities(&adapter);
         // Shader code in this tutorial assumes an sRGB surface texture. Using a different
