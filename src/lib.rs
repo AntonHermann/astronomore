@@ -156,7 +156,7 @@ impl State {
                 ],
                 label: Some("texture_bind_group_layout"),
             });
-        let diffuse_bytes = include_bytes!("dbg.png");
+        let diffuse_bytes = include_bytes!("textures/dbg.png");
         let diffuse_texture = texture::Texture::from_bytes(
             &device,
             &queue,
