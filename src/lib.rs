@@ -57,6 +57,9 @@ pub struct State {
     // diffuse_bind_group: wgpu::BindGroup,
     identity_model_bind_group: wgpu::BindGroup,
     scene: scene::Scene,
+    sim_time: f32,
+    sim_time_multiplier: f32,
+    is_paused: bool,
     camera: camera::Camera,
     projection: camera::Projection,
     camera_uniform: CameraUniform,
@@ -390,6 +393,9 @@ impl State {
             identity_model_bind_group,
             diffuse_texture,
             scene,
+            sim_time: 0.0,
+            sim_time_multiplier: 1.0,
+            is_paused: false,
             camera,
             projection,
             camera_uniform,
@@ -442,8 +448,11 @@ impl State {
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
 
-        let sim_time = now.duration_since(self.start_time).as_secs_f32();
-        self.scene.update(sim_time, &self.queue);
+        if !self.is_paused {
+            self.sim_time =
+                now.duration_since(self.start_time).as_secs_f32() * self.sim_time_multiplier;
+        }
+        self.scene.update(self.sim_time, &self.queue);
     }
 
     pub fn render(&mut self) -> miette::Result<()> {
@@ -548,6 +557,14 @@ impl State {
             event_loop.exit();
         } else if code == KeyCode::Tab && state.is_pressed() {
             self.wireframe = !self.wireframe;
+        } else if code == KeyCode::PageUp && state.is_pressed() {
+            self.sim_time_multiplier *= 2.0;
+        } else if code == KeyCode::PageDown && state.is_pressed() {
+            self.sim_time_multiplier /= 2.0;
+        } else if code == KeyCode::Digit0 && state.is_pressed() {
+            self.sim_time_multiplier = 1.0;
+        } else if code == KeyCode::KeyP && state.is_pressed() {
+            self.is_paused = !self.is_paused;
         } else {
             self.camera_controller.handle_key(code, state);
         }
