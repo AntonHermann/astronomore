@@ -557,14 +557,19 @@ impl State {
             event_loop.exit();
         } else if code == KeyCode::Tab && state.is_pressed() {
             self.wireframe = !self.wireframe;
+            tracing::info!("Wireframe mode: {}", self.wireframe);
         } else if code == KeyCode::PageUp && state.is_pressed() {
             self.sim_time_multiplier *= 2.0;
+            tracing::info!("Sim time mult: {}x", self.sim_time_multiplier);
         } else if code == KeyCode::PageDown && state.is_pressed() {
             self.sim_time_multiplier /= 2.0;
+            tracing::info!("Sim time mult: {}x", self.sim_time_multiplier);
         } else if code == KeyCode::Digit0 && state.is_pressed() {
             self.sim_time_multiplier = 1.0;
+            tracing::info!("Sim time mult reset: {}x", self.sim_time_multiplier);
         } else if code == KeyCode::KeyP && state.is_pressed() {
             self.is_paused = !self.is_paused;
+            tracing::info!("Simulation paused: {}", self.is_paused);
         } else {
             self.camera_controller.handle_key(code, state);
         }
