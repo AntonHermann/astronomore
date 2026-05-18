@@ -17,7 +17,7 @@ impl ModelUniform {
 
 pub struct CelestialBody {
     #[allow(dead_code)]
-    name: String,
+    pub name: String,
     texture: texture::Texture,
     mesh: mesh::Mesh,
     pub transform: transform::Transform,
