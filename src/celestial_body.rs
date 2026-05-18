@@ -1,6 +1,6 @@
 use wgpu::util::DeviceExt;
 
-use crate::{mesh, texture, transform};
+use crate::{mesh, texture};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -8,11 +8,30 @@ pub struct ModelUniform {
     pub model_matrix: [[f32; 4]; 4],
 }
 impl ModelUniform {
-    pub fn from_transform(transform: &transform::Transform) -> Self {
+    pub fn new(world_transform: &glam::Mat4, spin_transform: &glam::Mat4, radius: f32) -> Self {
+        let scale = glam::Mat4::from_scale(glam::Vec3::splat(radius));
+        let model_matrix = world_transform * spin_transform * scale;
         Self {
-            model_matrix: transform.local_matrix().to_cols_array_2d(),
+            model_matrix: model_matrix.to_cols_array_2d(),
         }
     }
+}
+impl Default for ModelUniform {
+    fn default() -> Self {
+        Self {
+            model_matrix: glam::Mat4::IDENTITY.to_cols_array_2d(),
+        }
+    }
+}
+
+pub struct OrbitalParameters {
+    /// Optional index of the parent celestial body in the scene's celestial_bodies list. None if this is a root body (e.g. the sun)
+    pub parent_id: Option<usize>,
+    /// Distance from the parent body
+    /// TODO: unit?
+    pub radius: f32,
+    /// Angular velocity in radians per second
+    pub angular_velocity: f32,
 }
 
 pub struct CelestialBody {
@@ -20,7 +39,10 @@ pub struct CelestialBody {
     pub name: String,
     texture: texture::Texture,
     mesh: mesh::Mesh,
-    pub transform: transform::Transform,
+    pub radius: f32,
+    pub orbital_parameters: OrbitalParameters,
+    pub orbital_transform: glam::Mat4,
+    pub spin_transform: glam::Mat4,
     pub model_uniform: ModelUniform,
     pub model_buffer: wgpu::Buffer,
     pub model_bind_group: wgpu::BindGroup,
@@ -29,13 +51,20 @@ impl CelestialBody {
     pub fn new(
         device: &wgpu::Device,
         name: &str,
+        distance_from_parent: f32,
+        radius: f32,
         texture: texture::Texture,
-        transform: transform::Transform,
         model_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let mesh = mesh::Mesh::sphere(device, 128, 64);
 
-        let model_uniform = ModelUniform::from_transform(&transform);
+        let orbital_parameters = OrbitalParameters {
+            parent_id: None,
+            radius: distance_from_parent,
+            angular_velocity: 0.05,
+        };
+
+        let model_uniform = ModelUniform::new(&glam::Mat4::IDENTITY, &glam::Mat4::IDENTITY, radius);
 
         let model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("{} Model Buffer", name)),
@@ -56,16 +85,33 @@ impl CelestialBody {
             name: name.into(),
             texture,
             mesh,
-            transform,
+            radius,
+            orbital_parameters,
+            orbital_transform: glam::Mat4::IDENTITY,
+            spin_transform: glam::Mat4::IDENTITY,
             model_uniform,
             model_buffer,
             model_bind_group,
         }
     }
 
-    pub fn update(&mut self, dt: std::time::Duration) {
+    /// TODO: change from Duration to sim_time
+    pub fn update(&mut self, sim_time: f32) {
+        let angle = self.orbital_parameters.angular_velocity * sim_time;
+        let pos = glam::Vec3::new(
+            self.orbital_parameters.radius * angle.cos(),
+            0.,
+            self.orbital_parameters.radius * angle.sin(),
+        );
+        self.orbital_transform = glam::Mat4::from_translation(pos);
+
         // rotate 0.1 radians per second around the y-axis
-        self.transform.rotation *= glam::Quat::from_rotation_y(0.1 * dt.as_secs_f32());
+        self.spin_transform = glam::Mat4::from_rotation_y(0.1 * sim_time);
+    }
+
+    /// Update the model uniform based on its absolute world transform (i.e. combined with parent transforms) and its spin transform
+    pub fn update_model_uniform(&mut self, world_transform: glam::Mat4) {
+        self.model_uniform = ModelUniform::new(&world_transform, &self.spin_transform, self.radius);
     }
 }
 

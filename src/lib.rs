@@ -3,7 +3,6 @@ mod celestial_body;
 mod mesh;
 mod scene;
 mod texture;
-mod transform;
 
 use std::sync::Arc;
 
@@ -48,6 +47,7 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     is_surface_configured: bool,
     window: Arc<Window>,
+    start_time: std::time::Instant,
     last_update: std::time::Instant,
     render_pipeline: wgpu::RenderPipeline,
     wireframe_pipeline: wgpu::RenderPipeline,
@@ -243,8 +243,9 @@ impl State {
         scene.add_celestial_body(CelestialBody::new(
             &device,
             "Earth",
+            0.,
+            1.,
             earth_texture,
-            transform::Transform::default(),
             &scene.model_bind_group_layout,
         ));
 
@@ -328,8 +329,7 @@ impl State {
             "fs_wireframe",
         );
 
-        let identity_model_uniform =
-            celestial_body::ModelUniform::from_transform(&transform::Transform::default());
+        let identity_model_uniform = celestial_body::ModelUniform::default();
         let identity_model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Identity Model Buffer"),
             contents: bytemuck::cast_slice(&[identity_model_uniform]),
@@ -350,6 +350,8 @@ impl State {
             // mesh::Mesh::z_plane(&device),
         ];
 
+        let start_time = std::time::Instant::now();
+
         Ok(Self {
             surface,
             device,
@@ -357,7 +359,8 @@ impl State {
             config,
             is_surface_configured: false,
             window,
-            last_update: std::time::Instant::now(),
+            start_time,
+            last_update: start_time,
             render_pipeline,
             wireframe_pipeline,
             wireframe: false,
@@ -417,7 +420,8 @@ impl State {
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
 
-        self.scene.update(dt, &self.queue);
+        let sim_time = now.duration_since(self.start_time).as_secs_f32();
+        self.scene.update(sim_time, &self.queue);
     }
 
     pub fn render(&mut self) -> miette::Result<()> {
