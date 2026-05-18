@@ -1,5 +1,9 @@
 use crate::celestial_body::CelestialBody;
 
+/// Index of a celestial body in the scene's celestial_bodies list.
+/// Can only be constructed by the scene when adding a celestial body, and is used to reference celestial bodies (e.g. as parents in orbital parameters) without exposing the internal list structure of the scene.
+pub struct BodyId(usize);
+
 pub struct Scene {
     pub celestial_bodies: Vec<CelestialBody>,
     pub model_bind_group_layout: wgpu::BindGroupLayout,
@@ -27,9 +31,20 @@ impl Scene {
         }
     }
 
-    pub fn add_celestial_body(&mut self, body: CelestialBody) {
+    pub fn add_celestial_body(
+        &mut self,
+        mut body: CelestialBody,
+        parent: Option<BodyId>,
+    ) -> BodyId {
+        let id = BodyId(self.celestial_bodies.len());
+        debug_assert!(
+            parent.as_ref().is_none_or(|p| p.0 < id.0),
+            "Parent celestial body must be added before its children"
+        );
+        body.orbital_parameters.parent_id = parent.map(|p| p.0);
         self.celestial_bodies.push(body);
         self.validate_parent_ordering();
+        id
     }
 
     /// Validate that parents are always before their children in the list

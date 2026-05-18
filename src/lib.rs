@@ -191,6 +191,14 @@ impl State {
             "earth.jpg",
             &texture_bind_group_layout,
         )?;
+        let moon_bytes = include_bytes!("textures/2k_moon.jpg");
+        let moon_texture = texture::Texture::from_bytes(
+            &device,
+            &queue,
+            moon_bytes,
+            "moon.jpg",
+            &texture_bind_group_layout,
+        )?;
 
         // ======= Camera setup =======
 
@@ -240,14 +248,28 @@ impl State {
 
         // ==================== Scene setup =====================
         let mut scene = scene::Scene::new(&device);
-        scene.add_celestial_body(CelestialBody::new(
-            &device,
-            "Earth",
-            0.,
-            1.,
-            earth_texture,
-            &scene.model_bind_group_layout,
-        ));
+        let earth_id = scene.add_celestial_body(
+            CelestialBody::new(
+                &device,
+                "Earth",
+                0.,
+                1.,
+                earth_texture,
+                &scene.model_bind_group_layout,
+            ),
+            None,
+        );
+        scene.add_celestial_body(
+            CelestialBody::new(
+                &device,
+                "Moon",
+                3.,
+                0.27,
+                moon_texture,
+                &scene.model_bind_group_layout,
+            ),
+            Some(earth_id),
+        );
 
         // ================= Render Pipeline =================
 
