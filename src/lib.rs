@@ -1,7 +1,9 @@
 mod camera;
 mod celestial_body;
 mod mesh;
+mod scene;
 mod texture;
+mod transform;
 
 use std::sync::Arc;
 
@@ -53,7 +55,8 @@ pub struct State {
     meshes: Vec<mesh::Mesh>,
     diffuse_texture: texture::Texture,
     // diffuse_bind_group: wgpu::BindGroup,
-    planets: Vec<CelestialBody>,
+    identity_model_bind_group: wgpu::BindGroup,
+    scene: scene::Scene,
     camera: camera::Camera,
     projection: camera::Projection,
     camera_uniform: CameraUniform,
@@ -235,6 +238,16 @@ impl State {
         let depth_texture =
             texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
+        // ==================== Scene setup =====================
+        let mut scene = scene::Scene::new(&device);
+        scene.add_celestial_body(CelestialBody::new(
+            &device,
+            "Earth",
+            earth_texture,
+            transform::Transform::default(),
+            &scene.model_bind_group_layout,
+        ));
+
         // ================= Render Pipeline =================
 
         let shader = device.create_shader_module(wgpu::include_wgsl!("shaders/shader.wgsl"));
@@ -244,6 +257,7 @@ impl State {
                 bind_group_layouts: &[
                     Some(&texture_bind_group_layout),
                     Some(&camera_bind_group_layout),
+                    Some(&scene.model_bind_group_layout),
                 ],
                 immediate_size: 0,
             });
@@ -314,8 +328,21 @@ impl State {
             "fs_wireframe",
         );
 
-        let planets = vec![CelestialBody::new(&device, "Earth", earth_texture)];
-
+        let identity_model_uniform =
+            celestial_body::ModelUniform::from_transform(&transform::Transform::default());
+        let identity_model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Identity Model Buffer"),
+            contents: bytemuck::cast_slice(&[identity_model_uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let identity_model_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &scene.model_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: identity_model_buffer.as_entire_binding(),
+            }],
+            label: Some("Identity Model Bind Group"),
+        });
         let meshes = vec![
             // mesh::Mesh::default_sphere(&device),
             // mesh::Mesh::x_plane(&device),
@@ -335,8 +362,9 @@ impl State {
             wireframe_pipeline,
             wireframe: false,
             meshes,
+            identity_model_bind_group,
             diffuse_texture,
-            planets,
+            scene,
             camera,
             projection,
             camera_uniform,
@@ -388,6 +416,8 @@ impl State {
             0,
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
+
+        self.scene.update(dt, &self.queue);
     }
 
     pub fn render(&mut self) -> miette::Result<()> {
@@ -468,12 +498,14 @@ impl State {
             render_pass.set_pipeline(pipeline);
             render_pass.set_bind_group(0, &self.diffuse_texture.bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
+            render_pass.set_bind_group(2, &self.identity_model_bind_group, &[]);
 
             for mesh in &self.meshes {
                 render_pass.draw_mesh(mesh);
             }
 
-            for planet in &self.planets {
+            // TODO: move this logic into the scene and/or celestial body
+            for planet in &self.scene.celestial_bodies {
                 render_pass.draw_celestial_body(planet, &self.camera_bind_group);
             }
         }
