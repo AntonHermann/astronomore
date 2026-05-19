@@ -29,10 +29,8 @@ impl Camera {
 
 pub struct FpsCamera {
     pub position: glam::Vec3,
-    /// Rotation (in radians) around the vertical axis (y-axis)
-    yaw_rad: f32,
-    /// Rotation (in radians) around the horizontal axis (x-axis)
-    pitch_rad: f32,
+    pub yaw_rad: f32,
+    pub pitch_rad: f32,
 }
 
 impl FpsCamera {
@@ -91,8 +89,8 @@ pub struct FpsCameraController {
     rotate_horizontal: f32,
     rotate_vertical: f32,
     scroll: f32,
-    speed: f32,
-    sensitivity: f32,
+    pub speed: f32,
+    pub sensitivity: f32,
 }
 
 impl FpsCameraController {

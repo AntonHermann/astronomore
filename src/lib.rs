@@ -582,6 +582,11 @@ impl State {
         let mut toggle_pause = false;
         let mut toggle_wireframe = false;
         let mut new_multiplier: Option<f32> = None;
+        let mut cam_speed = self.camera_controller.speed;
+        let mut cam_sensitivity = self.camera_controller.sensitivity;
+        let mut reset_camera = false;
+        let camera::Camera::Fps(cam_ref) = &self.camera;
+        let cam_pos = cam_ref.position;
 
         let raw_input = self.egui_state.take_egui_input(&self.window);
         self.egui_ctx.begin_pass(raw_input);
@@ -635,6 +640,25 @@ impl State {
                 {
                     toggle_wireframe = true;
                 }
+                ui.separator();
+                egui::CollapsingHeader::new("Kamera")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.label(format!(
+                            "Position: ({:.1}, {:.1}, {:.1})",
+                            cam_pos.x, cam_pos.y, cam_pos.z
+                        ));
+                        ui.add(
+                            egui::Slider::new(&mut cam_speed, 0.5..=30.0).text("Geschwindigkeit"),
+                        );
+                        ui.add(
+                            egui::Slider::new(&mut cam_sensitivity, 0.1..=5.0)
+                                .text("Empfindlichkeit"),
+                        );
+                        if ui.button("Zurücksetzen").clicked() {
+                            reset_camera = true;
+                        }
+                    });
             });
         let full_output = self.egui_ctx.end_pass();
 
@@ -646,6 +670,14 @@ impl State {
         }
         if let Some(m) = new_multiplier {
             self.sim_time_multiplier = m;
+        }
+        self.camera_controller.speed = cam_speed;
+        self.camera_controller.sensitivity = cam_sensitivity;
+        if reset_camera {
+            let camera::Camera::Fps(cam) = &mut self.camera;
+            cam.position = glam::Vec3::new(0.0, 5.0, 10.0);
+            cam.yaw_rad = -90f32.to_radians();
+            cam.pitch_rad = -20f32.to_radians();
         }
 
         self.egui_state
