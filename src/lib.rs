@@ -1,5 +1,6 @@
 mod camera;
 mod celestial_body;
+mod grid;
 mod loader;
 mod mesh;
 mod scene;
@@ -23,6 +24,7 @@ use wasm_bindgen::prelude::*;
 use winit::platform::web::EventLoopExtWebSys;
 
 use crate::celestial_body::{CelestialBody, DrawCelestialBody};
+use crate::grid::{ColorVertex, DrawGrid, GridMesh};
 use crate::mesh::{DrawMesh, Vertex};
 
 #[repr(C)]
@@ -54,6 +56,13 @@ pub struct State {
     render_pipeline: wgpu::RenderPipeline,
     wireframe_pipeline: wgpu::RenderPipeline,
     wireframe: bool,
+    grid_pipeline: wgpu::RenderPipeline,
+    grid_xz: GridMesh,
+    grid_xy: GridMesh,
+    grid_yz: GridMesh,
+    show_grid_xz: bool,
+    show_grid_xy: bool,
+    show_grid_yz: bool,
     meshes: Vec<mesh::Mesh>,
     diffuse_texture: texture::Texture,
     // diffuse_bind_group: wgpu::BindGroup,
@@ -359,6 +368,61 @@ impl State {
             "fs_wireframe",
         );
 
+        // ================= Grid Pipeline =================
+        let grid_shader = device.create_shader_module(wgpu::include_wgsl!("shaders/grid.wgsl"));
+        let grid_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Grid Pipeline Layout"),
+            bind_group_layouts: &[Some(&camera_bind_group_layout)],
+            immediate_size: 0,
+        });
+        let grid_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Grid Pipeline"),
+            layout: Some(&grid_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &grid_shader,
+                entry_point: Some("vs_main"),
+                buffers: &[ColorVertex::desc()],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &grid_shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::LineList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: texture::Texture::DEPTH_FORMAT,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::Less),
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview_mask: None,
+            cache: None,
+        });
+
+        let grid_xz = GridMesh::xz_plane(&device, 10);
+        let grid_xy = GridMesh::xy_plane(&device, 10);
+        let grid_yz = GridMesh::yz_plane(&device, 10);
+
         let identity_model_uniform = celestial_body::ModelUniform::default();
         let identity_model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Identity Model Buffer"),
@@ -411,6 +475,13 @@ impl State {
             render_pipeline,
             wireframe_pipeline,
             wireframe: false,
+            grid_pipeline,
+            grid_xz,
+            grid_xy,
+            grid_yz,
+            show_grid_xz: true,
+            show_grid_xy: false,
+            show_grid_yz: false,
             meshes,
             identity_model_bind_group,
             diffuse_texture,
@@ -569,6 +640,18 @@ impl State {
             for planet in &self.scene.celestial_bodies {
                 render_pass.draw_celestial_body(planet, &self.camera_bind_group);
             }
+
+            render_pass.set_pipeline(&self.grid_pipeline);
+            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+            if self.show_grid_xz {
+                render_pass.draw_grid(&self.grid_xz);
+            }
+            if self.show_grid_xy {
+                render_pass.draw_grid(&self.grid_xy);
+            }
+            if self.show_grid_yz {
+                render_pass.draw_grid(&self.grid_yz);
+            }
         }
 
         // ==================== egui pass ====================
@@ -583,6 +666,12 @@ impl State {
         let mut toggle_pause = false;
         let mut toggle_wireframe = false;
         let mut new_multiplier: Option<f32> = None;
+        let show_grid_xz = self.show_grid_xz;
+        let show_grid_xy = self.show_grid_xy;
+        let show_grid_yz = self.show_grid_yz;
+        let mut new_grid_xz: Option<bool> = None;
+        let mut new_grid_xy: Option<bool> = None;
+        let mut new_grid_yz: Option<bool> = None;
         let mut cam_speed = self.camera_controller.speed;
         let mut cam_sensitivity = self.camera_controller.sensitivity;
         let mut reset_camera = false;
@@ -642,6 +731,24 @@ impl State {
                     toggle_wireframe = true;
                 }
                 ui.separator();
+                egui::CollapsingHeader::new("Gitternetz")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.label("G = alle umschalten");
+                        let mut xz = show_grid_xz;
+                        if ui.checkbox(&mut xz, "XZ-Ebene (Boden)").changed() {
+                            new_grid_xz = Some(xz);
+                        }
+                        let mut xy = show_grid_xy;
+                        if ui.checkbox(&mut xy, "XY-Ebene").changed() {
+                            new_grid_xy = Some(xy);
+                        }
+                        let mut yz = show_grid_yz;
+                        if ui.checkbox(&mut yz, "YZ-Ebene").changed() {
+                            new_grid_yz = Some(yz);
+                        }
+                    });
+                ui.separator();
                 egui::CollapsingHeader::new("Kamera")
                     .default_open(true)
                     .show(ui, |ui| {
@@ -668,6 +775,15 @@ impl State {
         }
         if toggle_wireframe {
             self.wireframe = !self.wireframe;
+        }
+        if let Some(v) = new_grid_xz {
+            self.show_grid_xz = v;
+        }
+        if let Some(v) = new_grid_xy {
+            self.show_grid_xy = v;
+        }
+        if let Some(v) = new_grid_yz {
+            self.show_grid_yz = v;
         }
         if let Some(m) = new_multiplier {
             self.sim_time_multiplier = m;
@@ -755,6 +871,12 @@ impl State {
         } else if code == KeyCode::KeyP && state.is_pressed() {
             self.is_paused = !self.is_paused;
             tracing::info!("Simulation paused: {}", self.is_paused);
+        } else if code == KeyCode::KeyG && state.is_pressed() {
+            let any = self.show_grid_xz || self.show_grid_xy || self.show_grid_yz;
+            self.show_grid_xz = !any;
+            self.show_grid_xy = !any;
+            self.show_grid_yz = !any;
+            tracing::info!("Grids: {}", !any);
         } else {
             self.camera_controller.handle_key(code, state);
         }
