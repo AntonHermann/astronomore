@@ -578,7 +578,9 @@ impl State {
         };
         let sim_time_multiplier = self.sim_time_multiplier;
         let is_paused = self.is_paused;
+        let wireframe = self.wireframe;
         let mut toggle_pause = false;
+        let mut toggle_wireframe = false;
         let mut new_multiplier: Option<f32> = None;
 
         let raw_input = self.egui_state.take_egui_input(&self.window);
@@ -620,11 +622,27 @@ impl State {
                         new_multiplier = Some(1.0);
                     }
                 });
+                ui.separator();
+                let wireframe_label = if wireframe {
+                    "Wireframe: an"
+                } else {
+                    "Wireframe: aus"
+                };
+                if ui
+                    .button(wireframe_label)
+                    .on_hover_text("Umschalten (Tab)")
+                    .clicked()
+                {
+                    toggle_wireframe = true;
+                }
             });
         let full_output = self.egui_ctx.end_pass();
 
         if toggle_pause {
             self.is_paused = !self.is_paused;
+        }
+        if toggle_wireframe {
+            self.wireframe = !self.wireframe;
         }
         if let Some(m) = new_multiplier {
             self.sim_time_multiplier = m;
