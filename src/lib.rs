@@ -47,9 +47,9 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     is_surface_configured: bool,
     window: Arc<Window>,
-    start_time: std::time::Instant,
-    last_update: std::time::Instant,
-    last_frame_duration: std::time::Duration,
+    start_time: web_time::Instant,
+    last_update: web_time::Instant,
+    last_frame_duration: web_time::Duration,
     render_pipeline: wgpu::RenderPipeline,
     wireframe_pipeline: wgpu::RenderPipeline,
     wireframe: bool,
@@ -379,7 +379,7 @@ impl State {
             // mesh::Mesh::z_plane(&device),
         ];
 
-        let start_time = std::time::Instant::now();
+        let start_time = web_time::Instant::now();
 
         // ==================== egui setup ====================
         let egui_ctx = egui::Context::default();
@@ -406,7 +406,7 @@ impl State {
             window,
             start_time,
             last_update: start_time,
-            last_frame_duration: std::time::Duration::ZERO,
+            last_frame_duration: web_time::Duration::ZERO,
             render_pipeline,
             wireframe_pipeline,
             wireframe: false,
@@ -445,7 +445,7 @@ impl State {
 
     /// Update application state before rendering
     pub fn update(&mut self) {
-        let now = std::time::Instant::now();
+        let now = web_time::Instant::now();
         let dt = now - self.last_update;
         self.last_frame_duration = dt;
         self.last_update = now;
