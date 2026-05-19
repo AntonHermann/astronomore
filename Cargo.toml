@@ -20,6 +20,9 @@ winit = { version = "0.30.13", features = ["android-native-activity"] }
 bytemuck = { version = "1.25.0", features = ["derive"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg"] }
 glam = "0.32.1"
+egui = "0.34"
+egui-wgpu = "0.34"
+egui-winit = { version = "0.34", default-features = false, features = ["links"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 miette = { version = "7.6.0" }

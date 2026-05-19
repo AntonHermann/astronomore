@@ -49,6 +49,7 @@ pub struct State {
     window: Arc<Window>,
     start_time: std::time::Instant,
     last_update: std::time::Instant,
+    last_frame_duration: std::time::Duration,
     render_pipeline: wgpu::RenderPipeline,
     wireframe_pipeline: wgpu::RenderPipeline,
     wireframe: bool,
@@ -68,6 +69,9 @@ pub struct State {
     camera_controller: camera::FpsCameraController,
     mouse_pressed: bool,
     depth_texture: texture::Texture,
+    egui_ctx: egui::Context,
+    egui_state: egui_winit::State,
+    egui_renderer: egui_wgpu::Renderer,
 }
 
 impl State {
@@ -377,6 +381,22 @@ impl State {
 
         let start_time = std::time::Instant::now();
 
+        // ==================== egui setup ====================
+        let egui_ctx = egui::Context::default();
+        let egui_state = egui_winit::State::new(
+            egui_ctx.clone(),
+            egui::ViewportId::ROOT,
+            window.as_ref(),
+            None,
+            None,
+            Some(device.limits().max_texture_dimension_2d as usize),
+        );
+        let egui_renderer = egui_wgpu::Renderer::new(
+            &device,
+            surface_format,
+            egui_wgpu::RendererOptions::default(),
+        );
+
         Ok(Self {
             surface,
             device,
@@ -386,6 +406,7 @@ impl State {
             window,
             start_time,
             last_update: start_time,
+            last_frame_duration: std::time::Duration::ZERO,
             render_pipeline,
             wireframe_pipeline,
             wireframe: false,
@@ -404,6 +425,9 @@ impl State {
             camera_controller,
             mouse_pressed: false,
             depth_texture,
+            egui_ctx,
+            egui_state,
+            egui_renderer,
         })
     }
 
@@ -423,6 +447,7 @@ impl State {
     pub fn update(&mut self) {
         let now = std::time::Instant::now();
         let dt = now - self.last_update;
+        self.last_frame_duration = dt;
         self.last_update = now;
 
         // Alternatives for updating the camera:
@@ -543,6 +568,115 @@ impl State {
             for planet in &self.scene.celestial_bodies {
                 render_pass.draw_celestial_body(planet, &self.camera_bind_group);
             }
+        }
+
+        // ==================== egui pass ====================
+        let fps = if self.last_frame_duration.as_secs_f64() > 0.0 {
+            1.0 / self.last_frame_duration.as_secs_f64()
+        } else {
+            0.0
+        };
+        let sim_time_multiplier = self.sim_time_multiplier;
+        let is_paused = self.is_paused;
+        let mut toggle_pause = false;
+        let mut new_multiplier: Option<f32> = None;
+
+        let raw_input = self.egui_state.take_egui_input(&self.window);
+        self.egui_ctx.begin_pass(raw_input);
+        egui::Window::new("Simulation")
+            .resizable(false)
+            .anchor(egui::Align2::RIGHT_TOP, egui::Vec2::new(-8.0, 8.0))
+            .show(&self.egui_ctx, |ui| {
+                ui.label(format!("FPS: {:.0}", fps));
+                ui.separator();
+                ui.label(format!(
+                    "Zeit-Faktor: {}x",
+                    if sim_time_multiplier.fract() == 0.0 {
+                        format!("{}", sim_time_multiplier as i32)
+                    } else {
+                        format!("{:.2}", sim_time_multiplier)
+                    }
+                ));
+                ui.horizontal(|ui| {
+                    if ui
+                        .button("◀◀")
+                        .on_hover_text("Halbieren (PageDown)")
+                        .clicked()
+                    {
+                        new_multiplier = Some(sim_time_multiplier / 2.0);
+                    }
+                    let pause_label = if is_paused { "▶" } else { "⏸" };
+                    if ui.button(pause_label).on_hover_text("Pause (P)").clicked() {
+                        toggle_pause = true;
+                    }
+                    if ui
+                        .button("▶▶")
+                        .on_hover_text("Verdoppeln (PageUp)")
+                        .clicked()
+                    {
+                        new_multiplier = Some(sim_time_multiplier * 2.0);
+                    }
+                    if ui.button("1×").on_hover_text("Zurücksetzen (0)").clicked() {
+                        new_multiplier = Some(1.0);
+                    }
+                });
+            });
+        let full_output = self.egui_ctx.end_pass();
+
+        if toggle_pause {
+            self.is_paused = !self.is_paused;
+        }
+        if let Some(m) = new_multiplier {
+            self.sim_time_multiplier = m;
+        }
+
+        self.egui_state
+            .handle_platform_output(&self.window, full_output.platform_output);
+        let clipped_primitives = self
+            .egui_ctx
+            .tessellate(full_output.shapes, full_output.pixels_per_point);
+        let screen_descriptor = egui_wgpu::ScreenDescriptor {
+            size_in_pixels: [self.config.width, self.config.height],
+            pixels_per_point: full_output.pixels_per_point,
+        };
+
+        for (id, image_delta) in &full_output.textures_delta.set {
+            self.egui_renderer
+                .update_texture(&self.device, &self.queue, *id, image_delta);
+        }
+        self.egui_renderer.update_buffers(
+            &self.device,
+            &self.queue,
+            &mut encoder,
+            &clipped_primitives,
+            &screen_descriptor,
+        );
+
+        {
+            let mut egui_pass = encoder
+                .begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("egui Render Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        depth_slice: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    occlusion_query_set: None,
+                    timestamp_writes: None,
+                    multiview_mask: None,
+                })
+                .forget_lifetime();
+            self.egui_renderer
+                .render(&mut egui_pass, &clipped_primitives, &screen_descriptor);
+        }
+
+        for id in &full_output.textures_delta.free {
+            self.egui_renderer.free_texture(id);
         }
 
         // submit will accept anything that implements IntoIter
@@ -684,6 +818,11 @@ impl ApplicationHandler<State> for App {
             None => return,
         };
 
+        let egui_consumed = state
+            .egui_state
+            .on_window_event(&state.window, &event)
+            .consumed;
+
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => state.resize(size.width, size.height),
@@ -705,15 +844,15 @@ impl ApplicationHandler<State> for App {
                         ..
                     },
                 ..
-            } => state.handle_key(event_loop, code, key_state),
-            WindowEvent::MouseWheel { delta, .. } => {
+            } if !egui_consumed => state.handle_key(event_loop, code, key_state),
+            WindowEvent::MouseWheel { delta, .. } if !egui_consumed => {
                 state.camera_controller.handle_mouse_scroll(&delta)
             }
             WindowEvent::MouseInput {
                 state: mouse_state,
                 button: MouseButton::Left,
                 ..
-            } => state.mouse_pressed = mouse_state.is_pressed(),
+            } if !egui_consumed => state.mouse_pressed = mouse_state.is_pressed(),
             _ => {}
         }
     }
