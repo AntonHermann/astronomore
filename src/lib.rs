@@ -1,5 +1,6 @@
 mod camera;
 mod celestial_body;
+mod loader;
 mod mesh;
 mod scene;
 mod texture;
@@ -182,27 +183,27 @@ impl State {
                 ],
                 label: Some("texture_bind_group_layout"),
             });
-        let diffuse_bytes = include_bytes!("textures/dbg.png");
+        let diffuse_bytes = loader::load_bytes("assets/textures/dbg.png").await?;
         let diffuse_texture = texture::Texture::from_bytes(
             &device,
             &queue,
-            diffuse_bytes,
+            &diffuse_bytes,
             "dbg.png",
             &texture_bind_group_layout,
         )?;
-        let earth_bytes = include_bytes!("textures/2k_earth_daymap.jpg");
+        let earth_bytes = loader::load_bytes("assets/textures/2k_earth_daymap.jpg").await?;
         let earth_texture = texture::Texture::from_bytes(
             &device,
             &queue,
-            earth_bytes,
+            &earth_bytes,
             "earth.jpg",
             &texture_bind_group_layout,
         )?;
-        let moon_bytes = include_bytes!("textures/2k_moon.jpg");
+        let moon_bytes = loader::load_bytes("assets/textures/2k_moon.jpg").await?;
         let moon_texture = texture::Texture::from_bytes(
             &device,
             &queue,
-            moon_bytes,
+            &moon_bytes,
             "moon.jpg",
             &texture_bind_group_layout,
         )?;
