@@ -39,8 +39,13 @@ impl CameraUniform {
             view_proj: glam::Mat4::IDENTITY.to_cols_array_2d(),
         }
     }
-    fn update_view_proj(&mut self, camera: &camera::Camera, projection: &camera::Projection) {
-        self.view_proj = (projection.calc_matrix() * camera.calc_matrix()).to_cols_array_2d();
+    fn update_view_proj(
+        &mut self,
+        camera: &camera::Camera,
+        projection: &camera::Projection,
+        scene: &scene::Scene,
+    ) {
+        self.view_proj = (projection.calc_matrix() * camera.calc_matrix(scene)).to_cols_array_2d();
     }
 }
 
@@ -78,7 +83,7 @@ pub struct State {
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
-    camera_controller: camera::FpsCameraController,
+    camera_controller: camera::CameraController,
     mouse_pressed: bool,
     depth_texture: texture::Texture,
     egui_ctx: egui::Context,
@@ -347,13 +352,11 @@ impl State {
 
         // ======= Camera setup =======
 
-        let camera =
-            camera::Camera::new_fps((0.0, 8.0, 25.0), -90f32.to_radians(), -15f32.to_radians());
         let projection =
             camera::Projection::new(size.width, size.height, 45.0f32.to_radians(), 0.1, 100.0);
 
         let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update_view_proj(&camera, &projection);
+        // camera creation and update_view_proj() called later, after scene was created
 
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
@@ -385,7 +388,7 @@ impl State {
             label: Some("Camera Bind Group"),
         });
 
-        let camera_controller = camera::FpsCameraController::new(4.0, 2.0);
+        let camera_controller = camera::CameraController::new(4.0, 2.0);
 
         // ================= Depth Texture setup =================
         let depth_texture =
@@ -429,6 +432,11 @@ impl State {
             ),
             Some(earth_id),
         );
+
+        // let camera =
+        //     camera::Camera::new_fps((0.0, 8.0, 25.0), -90f32.to_radians(), -15f32.to_radians());
+        let camera = camera::Camera::new_orbit(sun_id, 25.0, 0f32.to_radians(), 0f32.to_radians());
+        camera_uniform.update_view_proj(&camera, &projection, &scene);
 
         // ================= Render Pipeline =================
 
@@ -581,10 +589,10 @@ impl State {
         //    We won't talk about it here, but check out the Wgpu without a window tutorial if you want to know more.
         // 3. We can use write_buffer on queue.
         // --> we chose 3. src: https://sotrh.github.io/learn-wgpu/beginner/tutorial6-uniforms/#demo
-        let camera::Camera::Fps(camera) = &mut self.camera;
-        self.camera_controller.update_camera(camera, dt);
+        self.camera_controller
+            .update_camera(&mut self.camera, dt, &self.scene);
         self.camera_uniform
-            .update_view_proj(&self.camera, &self.projection);
+            .update_view_proj(&self.camera, &self.projection, &self.scene);
         self.queue.write_buffer(
             &self.camera_buffer,
             0,
@@ -715,8 +723,33 @@ impl State {
         let mut cam_speed = self.camera_controller.speed;
         let mut cam_sensitivity = self.camera_controller.sensitivity;
         let mut reset_camera = false;
-        let camera::Camera::Fps(cam_ref) = &self.camera;
-        let cam_pos = cam_ref.position;
+        let cam_pos = match &self.camera {
+            camera::Camera::Fps(camera) => camera.position,
+            camera::Camera::Orbit(camera) => camera.target_and_camera_pos(&self.scene).1,
+        };
+        let cam_is_fps = matches!(&self.camera, camera::Camera::Fps(_));
+        let mut fps_pos_x = 0.0f32;
+        let mut fps_pos_y = 0.0f32;
+        let mut fps_pos_z = 0.0f32;
+        let mut fps_yaw_deg = 0.0f32;
+        let mut fps_pitch_deg = 0.0f32;
+        let mut orbit_dist = 0.0f32;
+        let mut orbit_yaw_deg = 0.0f32;
+        let mut orbit_pitch_deg = 0.0f32;
+        match &self.camera {
+            camera::Camera::Fps(c) => {
+                fps_pos_x = c.position.x;
+                fps_pos_y = c.position.y;
+                fps_pos_z = c.position.z;
+                fps_yaw_deg = c.yaw_rad.to_degrees();
+                fps_pitch_deg = c.pitch_rad.to_degrees();
+            }
+            camera::Camera::Orbit(c) => {
+                orbit_dist = c.dist;
+                orbit_yaw_deg = c.yaw_rad.to_degrees();
+                orbit_pitch_deg = c.pitch_rad.to_degrees();
+            }
+        }
 
         let raw_input = self.egui_state.take_egui_input(&self.window);
         self.egui_ctx.begin_pass(raw_input);
@@ -792,10 +825,73 @@ impl State {
                 egui::CollapsingHeader::new("Kamera")
                     .default_open(true)
                     .show(ui, |ui| {
-                        ui.label(format!(
-                            "Position: ({:.1}, {:.1}, {:.1})",
-                            cam_pos.x, cam_pos.y, cam_pos.z
-                        ));
+                        ui.label(if cam_is_fps {
+                            "Modus: FPS"
+                        } else {
+                            "Modus: Orbit"
+                        });
+                        ui.separator();
+                        egui::Grid::new("cam_params")
+                            .num_columns(2)
+                            .striped(true)
+                            .show(ui, |ui| {
+                                if cam_is_fps {
+                                    ui.label("X:");
+                                    ui.add(egui::DragValue::new(&mut fps_pos_x).speed(0.1));
+                                    ui.end_row();
+                                    ui.label("Y:");
+                                    ui.add(egui::DragValue::new(&mut fps_pos_y).speed(0.1));
+                                    ui.end_row();
+                                    ui.label("Z:");
+                                    ui.add(egui::DragValue::new(&mut fps_pos_z).speed(0.1));
+                                    ui.end_row();
+                                    ui.label("Yaw:");
+                                    ui.add(
+                                        egui::DragValue::new(&mut fps_yaw_deg)
+                                            .suffix("°")
+                                            .speed(0.5),
+                                    );
+                                    ui.end_row();
+                                    ui.label("Pitch:");
+                                    ui.add(
+                                        egui::DragValue::new(&mut fps_pitch_deg)
+                                            .suffix("°")
+                                            .speed(0.5)
+                                            .range(-89.9..=89.9f32),
+                                    );
+                                    ui.end_row();
+                                } else {
+                                    ui.label("Abstand:");
+                                    ui.add(
+                                        egui::DragValue::new(&mut orbit_dist)
+                                            .speed(0.1)
+                                            .range(0.1..=f32::MAX),
+                                    );
+                                    ui.end_row();
+                                    ui.label("Yaw:");
+                                    ui.add(
+                                        egui::DragValue::new(&mut orbit_yaw_deg)
+                                            .suffix("°")
+                                            .speed(0.5),
+                                    );
+                                    ui.end_row();
+                                    ui.label("Pitch:");
+                                    ui.add(
+                                        egui::DragValue::new(&mut orbit_pitch_deg)
+                                            .suffix("°")
+                                            .speed(0.5)
+                                            .range(-89.9..=89.9f32),
+                                    );
+                                    ui.end_row();
+                                    ui.label("Position:");
+                                    ui.label(format!(
+                                        "({:.1}, {:.1}, {:.1})",
+                                        cam_pos.x, cam_pos.y, cam_pos.z
+                                    ));
+                                    ui.end_row();
+                                }
+                            });
+                        ui.separator();
                         ui.add(
                             egui::Slider::new(&mut cam_speed, 0.5..=30.0).text("Geschwindigkeit"),
                         );
@@ -831,10 +927,24 @@ impl State {
         self.camera_controller.speed = cam_speed;
         self.camera_controller.sensitivity = cam_sensitivity;
         if reset_camera {
-            let camera::Camera::Fps(cam) = &mut self.camera;
-            cam.position = glam::Vec3::new(0.0, 8.0, 25.0);
-            cam.yaw_rad = -90f32.to_radians();
-            cam.pitch_rad = -20f32.to_radians();
+            self.camera = camera::Camera::Fps(camera::FpsCamera::new(
+                glam::Vec3::new(0.0, 8.0, 25.0),
+                -90f32.to_radians(),
+                -20f32.to_radians(),
+            ));
+        } else {
+            match &mut self.camera {
+                camera::Camera::Fps(c) => {
+                    c.position = glam::Vec3::new(fps_pos_x, fps_pos_y, fps_pos_z);
+                    c.yaw_rad = fps_yaw_deg.to_radians();
+                    c.pitch_rad = fps_pitch_deg.to_radians();
+                }
+                camera::Camera::Orbit(c) => {
+                    c.dist = orbit_dist;
+                    c.yaw_rad = orbit_yaw_deg.to_radians();
+                    c.pitch_rad = orbit_pitch_deg.to_radians();
+                }
+            }
         }
 
         self.egui_state
