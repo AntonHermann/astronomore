@@ -14,3 +14,12 @@ serve: build-wasm
 san:
     cargo fmt
     cargo clippy -- -D warnings
+
+# build release WASM and assemble site into _site/
+build-site:
+    wasm-pack build --target web --release
+    rm -rf _site
+    mkdir -p _site
+    cp index.html _site/
+    cp -r pkg _site/
+    cp -r assets _site/
