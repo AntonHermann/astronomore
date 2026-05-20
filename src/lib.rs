@@ -8,6 +8,7 @@ mod scene;
 mod shader_loader;
 mod sim;
 mod texture;
+mod ui;
 
 use std::sync::Arc;
 
@@ -62,18 +63,14 @@ pub struct State {
     render_pipeline_layout: wgpu::PipelineLayout,
     render_pipeline: wgpu::RenderPipeline,
     wireframe_pipeline: wgpu::RenderPipeline,
-    wireframe: bool,
     grid_pipeline_layout: wgpu::PipelineLayout,
     grid_pipeline: wgpu::RenderPipeline,
     grid_xz: GridMesh,
     grid_xy: GridMesh,
     grid_yz: GridMesh,
-    show_grid_xz: bool,
-    show_grid_xy: bool,
-    show_grid_yz: bool,
     normals_pipeline_layout: wgpu::PipelineLayout,
     normals_pipeline: wgpu::RenderPipeline,
-    show_normals: bool,
+    view: ui::ViewOptions,
     meshes: Vec<mesh::Mesh>,
     diffuse_texture: texture::Texture,
     // diffuse_bind_group: wgpu::BindGroup,
@@ -88,9 +85,7 @@ pub struct State {
     camera_controller: CameraController,
     mouse_pressed: bool,
     depth_texture: texture::Texture,
-    egui_ctx: egui::Context,
-    egui_state: egui_winit::State,
-    egui_renderer: egui_wgpu::Renderer,
+    ui: ui::EguiLayer,
 }
 
 fn build_main_pipelines(
@@ -535,20 +530,7 @@ impl State {
         ];
 
         // ==================== egui setup ====================
-        let egui_ctx = egui::Context::default();
-        let egui_state = egui_winit::State::new(
-            egui_ctx.clone(),
-            egui::ViewportId::ROOT,
-            window.as_ref(),
-            None,
-            None,
-            Some(device.limits().max_texture_dimension_2d as usize),
-        );
-        let egui_renderer = egui_wgpu::Renderer::new(
-            &device,
-            surface_format,
-            egui_wgpu::RendererOptions::default(),
-        );
+        let ui_layer = ui::EguiLayer::new(&device, &window, surface_format);
 
         Ok(Self {
             surface,
@@ -562,18 +544,14 @@ impl State {
             render_pipeline_layout,
             render_pipeline,
             wireframe_pipeline,
-            wireframe: false,
             grid_pipeline_layout,
             grid_pipeline,
             grid_xz,
             grid_xy,
             grid_yz,
-            show_grid_xz: true,
-            show_grid_xy: false,
-            show_grid_yz: false,
             normals_pipeline_layout,
             normals_pipeline,
-            show_normals: false,
+            view: ui::ViewOptions::new(),
             meshes,
             identity_model_bind_group,
             diffuse_texture,
@@ -587,9 +565,7 @@ impl State {
             camera_controller,
             mouse_pressed: false,
             depth_texture,
-            egui_ctx,
-            egui_state,
-            egui_renderer,
+            ui: ui_layer,
         })
     }
 
@@ -669,7 +645,7 @@ impl State {
             }
         };
 
-        let view = output
+        let frame_view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -683,7 +659,7 @@ impl State {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
+                    view: &frame_view,
                     resolve_target: None,
                     depth_slice: None,
                     ops: wgpu::Operations {
@@ -709,7 +685,7 @@ impl State {
                 multiview_mask: None,
             });
 
-            let pipeline = if self.wireframe {
+            let pipeline = if self.view.wireframe {
                 &self.wireframe_pipeline
             } else {
                 &self.render_pipeline
@@ -728,7 +704,7 @@ impl State {
                 render_pass.draw_celestial_body(planet, &self.camera_bind_group);
             }
 
-            if self.show_normals {
+            if self.view.show_normals {
                 render_pass.set_pipeline(&self.normals_pipeline);
                 for planet in &self.scene.celestial_bodies {
                     render_pass.draw_body_normals(planet, &self.camera_bind_group);
@@ -737,13 +713,13 @@ impl State {
 
             render_pass.set_pipeline(&self.grid_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            if self.show_grid_xz {
+            if self.view.show_grid_xz {
                 render_pass.draw_grid(&self.grid_xz);
             }
-            if self.show_grid_xy {
+            if self.view.show_grid_xy {
                 render_pass.draw_grid(&self.grid_xy);
             }
-            if self.show_grid_yz {
+            if self.view.show_grid_yz {
                 render_pass.draw_grid(&self.grid_yz);
             }
         }
@@ -755,16 +731,7 @@ impl State {
             0.0
         };
         let sim = &mut self.sim;
-        let wireframe = self.wireframe;
-        let show_normals = self.show_normals;
-        let mut toggle_wireframe = false;
-        let mut toggle_normals = false;
-        let show_grid_xz = self.show_grid_xz;
-        let show_grid_xy = self.show_grid_xy;
-        let show_grid_yz = self.show_grid_yz;
-        let mut new_grid_xz: Option<bool> = None;
-        let mut new_grid_xy: Option<bool> = None;
-        let mut new_grid_yz: Option<bool> = None;
+        let view = &mut self.view;
         let mut cam_speed = self.camera_controller.speed;
         let mut cam_sensitivity = self.camera_controller.sensitivity;
         let mut reset_camera = false;
@@ -807,12 +774,12 @@ impl State {
             }
         }
 
-        let raw_input = self.egui_state.take_egui_input(&self.window);
-        self.egui_ctx.begin_pass(raw_input);
+        let raw_input = self.ui.state.take_egui_input(&self.window);
+        self.ui.ctx.begin_pass(raw_input);
         egui::Window::new("Simulation")
             .resizable(false)
             .anchor(egui::Align2::RIGHT_TOP, egui::Vec2::new(-8.0, 8.0))
-            .show(&self.egui_ctx, |ui| {
+            .show(&self.ui.ctx, |ui| {
                 ui.label(format!("FPS: {:.0}", fps));
                 ui.separator();
                 ui.label(format!(
@@ -847,7 +814,7 @@ impl State {
                     }
                 });
                 ui.separator();
-                let wireframe_label = if wireframe {
+                let wireframe_label = if view.wireframe {
                     "Wireframe: an"
                 } else {
                     "Wireframe: aus"
@@ -857,9 +824,9 @@ impl State {
                     .on_hover_text("Umschalten (Tab)")
                     .clicked()
                 {
-                    toggle_wireframe = true;
+                    view.toggle_wireframe();
                 }
-                let normals_label = if show_normals {
+                let normals_label = if view.show_normals {
                     "Normalen: an"
                 } else {
                     "Normalen: aus"
@@ -869,25 +836,16 @@ impl State {
                     .on_hover_text("Umschalten (N)")
                     .clicked()
                 {
-                    toggle_normals = true;
+                    view.toggle_normals();
                 }
                 ui.separator();
                 egui::CollapsingHeader::new("Gitternetz")
                     .default_open(false)
                     .show(ui, |ui| {
                         ui.label("G = alle umschalten");
-                        let mut xz = show_grid_xz;
-                        if ui.checkbox(&mut xz, "XZ-Ebene (Boden)").changed() {
-                            new_grid_xz = Some(xz);
-                        }
-                        let mut xy = show_grid_xy;
-                        if ui.checkbox(&mut xy, "XY-Ebene").changed() {
-                            new_grid_xy = Some(xy);
-                        }
-                        let mut yz = show_grid_yz;
-                        if ui.checkbox(&mut yz, "YZ-Ebene").changed() {
-                            new_grid_yz = Some(yz);
-                        }
+                        ui.checkbox(&mut view.show_grid_xz, "XZ-Ebene (Boden)");
+                        ui.checkbox(&mut view.show_grid_xy, "XY-Ebene");
+                        ui.checkbox(&mut view.show_grid_yz, "YZ-Ebene");
                     });
                 ui.separator();
                 egui::CollapsingHeader::new("Kamera")
@@ -990,23 +948,8 @@ impl State {
                         }
                     });
             });
-        let full_output = self.egui_ctx.end_pass();
+        let full_output = self.ui.ctx.end_pass();
 
-        if toggle_wireframe {
-            self.wireframe = !self.wireframe;
-        }
-        if toggle_normals {
-            self.show_normals = !self.show_normals;
-        }
-        if let Some(v) = new_grid_xz {
-            self.show_grid_xz = v;
-        }
-        if let Some(v) = new_grid_xy {
-            self.show_grid_xy = v;
-        }
-        if let Some(v) = new_grid_yz {
-            self.show_grid_yz = v;
-        }
         self.camera_controller.speed = cam_speed;
         self.camera_controller.sensitivity = cam_sensitivity;
         let mode_switched = selected_is_fps != cam_is_fps;
@@ -1036,10 +979,12 @@ impl State {
             }
         }
 
-        self.egui_state
+        self.ui
+            .state
             .handle_platform_output(&self.window, full_output.platform_output);
         let clipped_primitives = self
-            .egui_ctx
+            .ui
+            .ctx
             .tessellate(full_output.shapes, full_output.pixels_per_point);
         let screen_descriptor = egui_wgpu::ScreenDescriptor {
             size_in_pixels: [self.config.width, self.config.height],
@@ -1047,10 +992,11 @@ impl State {
         };
 
         for (id, image_delta) in &full_output.textures_delta.set {
-            self.egui_renderer
+            self.ui
+                .renderer
                 .update_texture(&self.device, &self.queue, *id, image_delta);
         }
-        self.egui_renderer.update_buffers(
+        self.ui.renderer.update_buffers(
             &self.device,
             &self.queue,
             &mut encoder,
@@ -1063,7 +1009,7 @@ impl State {
                 .begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("egui Render Pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &view,
+                        view: &frame_view,
                         resolve_target: None,
                         depth_slice: None,
                         ops: wgpu::Operations {
@@ -1077,12 +1023,13 @@ impl State {
                     multiview_mask: None,
                 })
                 .forget_lifetime();
-            self.egui_renderer
+            self.ui
+                .renderer
                 .render(&mut egui_pass, &clipped_primitives, &screen_descriptor);
         }
 
         for id in &full_output.textures_delta.free {
-            self.egui_renderer.free_texture(id);
+            self.ui.renderer.free_texture(id);
         }
 
         // submit will accept anything that implements IntoIter
@@ -1096,11 +1043,11 @@ impl State {
         if code == KeyCode::Escape && state.is_pressed() {
             event_loop.exit();
         } else if code == KeyCode::Tab && state.is_pressed() {
-            self.wireframe = !self.wireframe;
-            tracing::info!("Wireframe mode: {}", self.wireframe);
+            self.view.toggle_wireframe();
+            tracing::info!("Wireframe mode: {}", self.view.wireframe);
         } else if code == KeyCode::KeyN && state.is_pressed() {
-            self.show_normals = !self.show_normals;
-            tracing::info!("Normalen-Visualisierung: {}", self.show_normals);
+            self.view.toggle_normals();
+            tracing::info!("Normalen-Visualisierung: {}", self.view.show_normals);
         } else if code == KeyCode::PageUp && state.is_pressed() {
             self.sim.double_speed();
         } else if code == KeyCode::PageDown && state.is_pressed() {
@@ -1110,11 +1057,8 @@ impl State {
         } else if code == KeyCode::KeyP && state.is_pressed() {
             self.sim.toggle_pause();
         } else if code == KeyCode::KeyG && state.is_pressed() {
-            let any = self.show_grid_xz || self.show_grid_xy || self.show_grid_yz;
-            self.show_grid_xz = !any;
-            self.show_grid_xy = !any;
-            self.show_grid_yz = !any;
-            tracing::info!("Grids: {}", !any);
+            self.view.toggle_all_grids();
+            tracing::info!("Grids: {}", self.view.any_grid_visible());
         } else {
             self.camera_controller.handle_key(code, state);
         }
@@ -1372,7 +1316,8 @@ impl ApplicationHandler<State> for App {
         };
 
         let egui_consumed = state
-            .egui_state
+            .ui
+            .state
             .on_window_event(&state.window, &event)
             .consumed;
 
