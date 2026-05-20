@@ -30,26 +30,9 @@ use winit::platform::web::EventLoopExtWebSys;
 use crate::grid::{ColorVertex, DrawGrid, GridMesh};
 use crate::mesh::{DrawMesh, Vertex};
 use crate::{
-    camera::{Camera, CameraController, Projection},
+    camera::{Camera, CameraRig},
     celestial_body::{CelestialBody, DrawCelestialBody, DrawCelestialBodyNormals},
 };
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct CameraUniform {
-    view_proj: [[f32; 4]; 4],
-}
-impl CameraUniform {
-    fn new() -> Self {
-        Self {
-            view_proj: glam::Mat4::IDENTITY.to_cols_array_2d(),
-        }
-    }
-    fn update_view_proj(&mut self, camera: &Camera, projection: &Projection, scene: &scene::Scene) {
-        self.view_proj = (projection.cam_to_clip_matrix() * camera.world_to_cam_matrix(scene))
-            .to_cols_array_2d();
-    }
-}
 
 pub struct State {
     surface: wgpu::Surface<'static>,
@@ -77,13 +60,7 @@ pub struct State {
     identity_model_bind_group: wgpu::BindGroup,
     scene: scene::Scene,
     sim: sim::SimState,
-    camera: Camera,
-    projection: Projection,
-    camera_uniform: CameraUniform,
-    camera_buffer: wgpu::Buffer,
-    camera_bind_group: wgpu::BindGroup,
-    camera_controller: CameraController,
-    mouse_pressed: bool,
+    camera_rig: CameraRig,
     depth_texture: texture::Texture,
     ui: ui::EguiLayer,
 }
@@ -375,45 +352,6 @@ impl State {
             &texture_bind_group_layout,
         )?;
 
-        // ======= Camera setup =======
-
-        let projection = Projection::new(size.width, size.height, 45.0f32.to_radians(), 0.1, 100.0);
-
-        let mut camera_uniform = CameraUniform::new();
-        // camera creation and update_view_proj() called later, after scene was created
-
-        let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Camera Buffer"),
-            contents: bytemuck::cast_slice(&[camera_uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let camera_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX, // only the vertex shader needs to see this
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-                label: Some("camera_bind_group_layout"),
-            });
-
-        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &camera_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: camera_buffer.as_entire_binding(),
-            }],
-            label: Some("Camera Bind Group"),
-        });
-
-        let camera_controller = CameraController::new(0.5, 2.0);
-
         // ================= Depth Texture setup =================
         let depth_texture =
             texture::Texture::create_depth_texture(&device, &config, "depth_texture");
@@ -447,10 +385,12 @@ impl State {
         }
         let sun_id = body_ids[planets::SolarSystemBody::Sun as usize];
 
-        // let camera =
+        // ======= Camera setup =======
+        // let initial_camera =
         //     Camera::new_fps((0.0, 8.0, 25.0), -90f32.to_radians(), -15f32.to_radians());
-        let camera = Camera::new_orbit(sun_id, 30.0, 0f32.to_radians(), 30f32.to_radians());
-        camera_uniform.update_view_proj(&camera, &projection, &scene);
+        let initial_camera =
+            Camera::new_orbit(sun_id, 30.0, 0f32.to_radians(), 30f32.to_radians());
+        let camera_rig = CameraRig::new(&device, size.width, size.height, initial_camera, &scene);
 
         // ================= Render Pipeline =================
 
@@ -462,7 +402,7 @@ impl State {
                 label: Some("Render Pipeline Layout"),
                 bind_group_layouts: &[
                     Some(&texture_bind_group_layout),
-                    Some(&camera_bind_group_layout),
+                    Some(&camera_rig.bind_group_layout),
                     Some(&scene.model_bind_group_layout),
                 ],
                 immediate_size: 0,
@@ -477,7 +417,7 @@ impl State {
         let grid_shader = shader_loader::make_shader_module(&device, "grid.wgsl", &grid_src);
         let grid_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Grid Pipeline Layout"),
-            bind_group_layouts: &[Some(&camera_bind_group_layout)],
+            bind_group_layouts: &[Some(&camera_rig.bind_group_layout)],
             immediate_size: 0,
         });
         let grid_pipeline =
@@ -496,7 +436,7 @@ impl State {
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Normals Pipeline Layout"),
                 bind_group_layouts: &[
-                    Some(&camera_bind_group_layout),
+                    Some(&camera_rig.bind_group_layout),
                     Some(&scene.model_bind_group_layout),
                 ],
                 immediate_size: 0,
@@ -557,13 +497,7 @@ impl State {
             diffuse_texture,
             scene,
             sim: sim::SimState::new(),
-            camera,
-            projection,
-            camera_uniform,
-            camera_buffer,
-            camera_bind_group,
-            camera_controller,
-            mouse_pressed: false,
+            camera_rig,
             depth_texture,
             ui: ui_layer,
         })
@@ -576,7 +510,7 @@ impl State {
             self.surface.configure(&self.device, &self.config);
             self.depth_texture =
                 texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
-            self.projection.resize(width, height);
+            self.camera_rig.resize(width, height);
             self.is_surface_configured = true;
         }
     }
@@ -590,29 +524,7 @@ impl State {
 
         self.sim.advance(dt);
         self.scene.update(self.sim.time, &self.queue);
-
-        // Alternatives for updating the camera:
-        // 1. We can create a separate buffer and copy its contents to our camera_buffer
-        //    The new buffer is known as a staging buffer.
-        //    This method is usually how it's done as it allows the contents of the main buffer
-        //    (in this case, camera_buffer) to be accessible only by the GPU.
-        //    The GPU can do some speed optimizations, which it couldn't if we could access the buffer via the CPU.
-        // 2. We can call one of the mapping methods map_read_async, and map_write_async on the buffer itself.
-        //    These allow us to access a buffer's contents directly but require us to deal with the
-        //    async aspect of these methods. This also requires our buffer to use the
-        //    BufferUsages::MAP_READ and/or BufferUsages::MAP_WRITE.
-        //    We won't talk about it here, but check out the Wgpu without a window tutorial if you want to know more.
-        // 3. We can use write_buffer on queue.
-        // --> we chose 3. src: https://sotrh.github.io/learn-wgpu/beginner/tutorial6-uniforms/#demo
-        self.camera_controller
-            .update_camera(&mut self.camera, dt, &self.scene);
-        self.camera_uniform
-            .update_view_proj(&self.camera, &self.projection, &self.scene);
-        self.queue.write_buffer(
-            &self.camera_buffer,
-            0,
-            bytemuck::cast_slice(&[self.camera_uniform]),
-        );
+        self.camera_rig.update(dt, &self.scene, &self.queue);
     }
 
     pub fn render(&mut self) -> miette::Result<()> {
@@ -692,7 +604,7 @@ impl State {
             };
             render_pass.set_pipeline(pipeline);
             render_pass.set_bind_group(0, &self.diffuse_texture.bind_group, &[]);
-            render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
+            render_pass.set_bind_group(1, &self.camera_rig.bind_group, &[]);
             render_pass.set_bind_group(2, &self.identity_model_bind_group, &[]);
 
             for mesh in &self.meshes {
@@ -701,18 +613,18 @@ impl State {
 
             // TODO: move this logic into the scene and/or celestial body
             for planet in &self.scene.celestial_bodies {
-                render_pass.draw_celestial_body(planet, &self.camera_bind_group);
+                render_pass.draw_celestial_body(planet, &self.camera_rig.bind_group);
             }
 
             if self.view.show_normals {
                 render_pass.set_pipeline(&self.normals_pipeline);
                 for planet in &self.scene.celestial_bodies {
-                    render_pass.draw_body_normals(planet, &self.camera_bind_group);
+                    render_pass.draw_body_normals(planet, &self.camera_rig.bind_group);
                 }
             }
 
             render_pass.set_pipeline(&self.grid_pipeline);
-            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+            render_pass.set_bind_group(0, &self.camera_rig.bind_group, &[]);
             if self.view.show_grid_xz {
                 render_pass.draw_grid(&self.grid_xz);
             }
@@ -732,14 +644,14 @@ impl State {
         };
         let sim = &mut self.sim;
         let view = &mut self.view;
-        let mut cam_speed = self.camera_controller.speed;
-        let mut cam_sensitivity = self.camera_controller.sensitivity;
+        let mut cam_speed = self.camera_rig.controller.speed;
+        let mut cam_sensitivity = self.camera_rig.controller.sensitivity;
         let mut reset_camera = false;
-        let cam_pos = match &self.camera {
+        let cam_pos = match &self.camera_rig.camera {
             Camera::Fps(camera) => camera.position,
             Camera::Orbit(camera) => camera.target_and_camera_pos(&self.scene).1,
         };
-        let cam_is_fps = matches!(&self.camera, Camera::Fps(_));
+        let cam_is_fps = matches!(&self.camera_rig.camera, Camera::Fps(_));
         let body_list: Vec<(scene::BodyId, String)> = self
             .scene
             .iter_bodies()
@@ -758,7 +670,7 @@ impl State {
         let mut orbit_yaw_deg = 0.0f32;
         let mut orbit_pitch_deg = 0.0f32;
         let mut selected_target = default_target;
-        match &self.camera {
+        match &self.camera_rig.camera {
             Camera::Fps(c) => {
                 fps_pos_x = c.position.x;
                 fps_pos_y = c.position.y;
@@ -950,11 +862,11 @@ impl State {
             });
         let full_output = self.ui.ctx.end_pass();
 
-        self.camera_controller.speed = cam_speed;
-        self.camera_controller.sensitivity = cam_sensitivity;
+        self.camera_rig.controller.speed = cam_speed;
+        self.camera_rig.controller.sensitivity = cam_sensitivity;
         let mode_switched = selected_is_fps != cam_is_fps;
         if mode_switched || reset_camera {
-            self.camera = if selected_is_fps {
+            self.camera_rig.camera = if selected_is_fps {
                 Camera::new_fps(
                     glam::Vec3::new(0.0, 8.0, 25.0),
                     -90f32.to_radians(),
@@ -964,7 +876,7 @@ impl State {
                 Camera::new_orbit(selected_target, 25.0, 0.0, 0.0)
             };
         } else {
-            match &mut self.camera {
+            match &mut self.camera_rig.camera {
                 Camera::Fps(c) => {
                     c.position = glam::Vec3::new(fps_pos_x, fps_pos_y, fps_pos_z);
                     c.yaw_rad = fps_yaw_deg.to_radians();
@@ -1060,7 +972,7 @@ impl State {
             self.view.toggle_all_grids();
             tracing::info!("Grids: {}", self.view.any_grid_visible());
         } else {
-            self.camera_controller.handle_key(code, state);
+            self.camera_rig.controller.handle_key(code, state);
         }
     }
 
@@ -1297,10 +1209,10 @@ impl ApplicationHandler<State> for App {
     ) {
         if let DeviceEvent::MouseMotion { delta } = event
             && let Some(state) = &mut self.state
-            && state.mouse_pressed
+            && state.camera_rig.mouse_pressed
         {
             let (mouse_dx, mouse_dy) = delta;
-            state.camera_controller.handle_mouse(mouse_dx, mouse_dy);
+            state.camera_rig.controller.handle_mouse(mouse_dx, mouse_dy);
         }
     }
 
@@ -1349,13 +1261,13 @@ impl ApplicationHandler<State> for App {
                 ..
             } if !egui_consumed => state.handle_key(event_loop, code, key_state),
             WindowEvent::MouseWheel { delta, .. } if !egui_consumed => {
-                state.camera_controller.handle_mouse_scroll(&delta)
+                state.camera_rig.controller.handle_mouse_scroll(&delta)
             }
             WindowEvent::MouseInput {
                 state: mouse_state,
                 button: MouseButton::Left,
                 ..
-            } if !egui_consumed => state.mouse_pressed = mouse_state.is_pressed(),
+            } if !egui_consumed => state.camera_rig.mouse_pressed = mouse_state.is_pressed(),
             _ => {}
         }
     }

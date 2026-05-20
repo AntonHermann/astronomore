@@ -1,5 +1,6 @@
 use std::f32::consts::FRAC_PI_2;
 use web_time::Duration;
+use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalPosition;
 use winit::event::*;
 use winit::keyboard::KeyCode;
@@ -295,4 +296,122 @@ impl CameraController {
             }
         }
     }
+}
+
+/// GPU-side view-projection matrix backing the camera bind group.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct CameraUniform {
+    view_proj: [[f32; 4]; 4],
+}
+
+impl CameraUniform {
+    /// Identity matrix; overwritten on the first `update_view_proj` call.
+    pub fn new() -> Self {
+        Self {
+            view_proj: glam::Mat4::IDENTITY.to_cols_array_2d(),
+        }
+    }
+
+    /// Recompute `view_proj` from the current camera + projection + scene state.
+    pub fn update_view_proj(&mut self, camera: &Camera, projection: &Projection, scene: &Scene) {
+        self.view_proj = (projection.cam_to_clip_matrix() * camera.world_to_cam_matrix(scene))
+            .to_cols_array_2d();
+    }
+}
+
+impl Default for CameraUniform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Owns everything camera-related: the camera enum, projection, input controller,
+/// and the uniform buffer + bind group that ship the view-projection matrix to the GPU.
+pub struct CameraRig {
+    /// Active camera (FPS or orbit). Mutated by the controller and the UI.
+    pub camera: Camera,
+    /// Perspective projection; resized when the surface size changes.
+    pub projection: Projection,
+    /// Keyboard/mouse-driven input integrator.
+    pub controller: CameraController,
+    /// Whether the left mouse button is currently held; gates mouse-look.
+    pub mouse_pressed: bool,
+    /// Bind group layout for the camera uniform; needed when building pipelines.
+    pub bind_group_layout: wgpu::BindGroupLayout,
+    /// Bind group bound at group 1 during the main render pass.
+    pub bind_group: wgpu::BindGroup,
+    uniform: CameraUniform,
+    buffer: wgpu::Buffer,
+}
+
+impl CameraRig {
+    /// Create the rig with all its GPU resources. The initial uniform is computed
+    /// from `camera`, `scene`, and a 45° perspective projection.
+    pub fn new(
+        device: &wgpu::Device,
+        width: u32,
+        height: u32,
+        camera: Camera,
+        scene: &Scene,
+    ) -> Self {
+        let projection = Projection::new(width, height, 45.0f32.to_radians(), 0.1, 100.0);
+
+        let mut uniform = CameraUniform::new();
+        uniform.update_view_proj(&camera, &projection, scene);
+
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Camera Buffer"),
+            contents: bytemuck::cast_slice(&[uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+            label: Some("camera_bind_group_layout"),
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+            label: Some("Camera Bind Group"),
+        });
+
+        Self {
+            camera,
+            projection,
+            controller: CameraController::new(0.5, 2.0),
+            mouse_pressed: false,
+            bind_group_layout,
+            bind_group,
+            uniform,
+            buffer,
+        }
+    }
+
+    /// Update the projection aspect ratio after a surface resize.
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.projection.resize(width, height);
+    }
+
+    /// Step the controller, recompute the view-projection uniform, and upload it.
+    pub fn update(&mut self, dt: Duration, scene: &Scene, queue: &wgpu::Queue) {
+        self.controller.update_camera(&mut self.camera, dt, scene);
+        self.uniform
+            .update_view_proj(&self.camera, &self.projection, scene);
+        queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&[self.uniform]));
+    }
+
 }
