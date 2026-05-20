@@ -6,6 +6,7 @@ mod mesh;
 mod planets;
 mod scene;
 mod shader_loader;
+mod sim;
 mod texture;
 
 use std::sync::Arc;
@@ -78,9 +79,7 @@ pub struct State {
     // diffuse_bind_group: wgpu::BindGroup,
     identity_model_bind_group: wgpu::BindGroup,
     scene: scene::Scene,
-    sim_time: f64,
-    sim_time_multiplier: f64,
-    is_paused: bool,
+    sim: sim::SimState,
     camera: Camera,
     projection: Projection,
     camera_uniform: CameraUniform,
@@ -579,9 +578,7 @@ impl State {
             identity_model_bind_group,
             diffuse_texture,
             scene,
-            sim_time: 0.0f64,
-            sim_time_multiplier: 1.0f64,
-            is_paused: false,
+            sim: sim::SimState::new(),
             camera,
             projection,
             camera_uniform,
@@ -615,10 +612,8 @@ impl State {
         self.last_frame_duration = dt;
         self.last_update = now;
 
-        if !self.is_paused {
-            self.sim_time += dt.as_secs_f64() * self.sim_time_multiplier;
-        }
-        self.scene.update(self.sim_time, &self.queue);
+        self.sim.advance(dt);
+        self.scene.update(self.sim.time, &self.queue);
 
         // Alternatives for updating the camera:
         // 1. We can create a separate buffer and copy its contents to our camera_buffer
@@ -759,14 +754,11 @@ impl State {
         } else {
             0.0
         };
-        let sim_time_multiplier = self.sim_time_multiplier;
-        let is_paused = self.is_paused;
+        let sim = &mut self.sim;
         let wireframe = self.wireframe;
         let show_normals = self.show_normals;
-        let mut toggle_pause = false;
         let mut toggle_wireframe = false;
         let mut toggle_normals = false;
-        let mut new_multiplier: Option<f64> = None;
         let show_grid_xz = self.show_grid_xz;
         let show_grid_xy = self.show_grid_xy;
         let show_grid_yz = self.show_grid_yz;
@@ -825,10 +817,10 @@ impl State {
                 ui.separator();
                 ui.label(format!(
                     "Zeit-Faktor: {}x",
-                    if sim_time_multiplier.fract() == 0.0 {
-                        format!("{}", sim_time_multiplier as i32)
+                    if sim.multiplier.fract() == 0.0 {
+                        format!("{}", sim.multiplier as i32)
                     } else {
-                        format!("{:.2}", sim_time_multiplier)
+                        format!("{:.2}", sim.multiplier)
                     }
                 ));
                 ui.horizontal(|ui| {
@@ -837,21 +829,21 @@ impl State {
                         .on_hover_text("Halbieren (PageDown)")
                         .clicked()
                     {
-                        new_multiplier = Some(sim_time_multiplier / 2.0);
+                        sim.halve_speed();
                     }
-                    let pause_label = if is_paused { "▶" } else { "⏸" };
+                    let pause_label = if sim.is_paused { "▶" } else { "⏸" };
                     if ui.button(pause_label).on_hover_text("Pause (P)").clicked() {
-                        toggle_pause = true;
+                        sim.toggle_pause();
                     }
                     if ui
                         .button("▶▶")
                         .on_hover_text("Verdoppeln (PageUp)")
                         .clicked()
                     {
-                        new_multiplier = Some(sim_time_multiplier * 2.0);
+                        sim.double_speed();
                     }
                     if ui.button("1×").on_hover_text("Zurücksetzen (0)").clicked() {
-                        new_multiplier = Some(1.0);
+                        sim.reset_speed();
                     }
                 });
                 ui.separator();
@@ -1000,9 +992,6 @@ impl State {
             });
         let full_output = self.egui_ctx.end_pass();
 
-        if toggle_pause {
-            self.is_paused = !self.is_paused;
-        }
         if toggle_wireframe {
             self.wireframe = !self.wireframe;
         }
@@ -1017,9 +1006,6 @@ impl State {
         }
         if let Some(v) = new_grid_yz {
             self.show_grid_yz = v;
-        }
-        if let Some(m) = new_multiplier {
-            self.sim_time_multiplier = m;
         }
         self.camera_controller.speed = cam_speed;
         self.camera_controller.sensitivity = cam_sensitivity;
@@ -1116,17 +1102,13 @@ impl State {
             self.show_normals = !self.show_normals;
             tracing::info!("Normalen-Visualisierung: {}", self.show_normals);
         } else if code == KeyCode::PageUp && state.is_pressed() {
-            self.sim_time_multiplier *= 2.0;
-            tracing::info!("Sim time mult: {}x", self.sim_time_multiplier);
+            self.sim.double_speed();
         } else if code == KeyCode::PageDown && state.is_pressed() {
-            self.sim_time_multiplier /= 2.0;
-            tracing::info!("Sim time mult: {}x", self.sim_time_multiplier);
+            self.sim.halve_speed();
         } else if code == KeyCode::Digit0 && state.is_pressed() {
-            self.sim_time_multiplier = 1.0;
-            tracing::info!("Sim time mult reset: {}x", self.sim_time_multiplier);
+            self.sim.reset_speed();
         } else if code == KeyCode::KeyP && state.is_pressed() {
-            self.is_paused = !self.is_paused;
-            tracing::info!("Simulation paused: {}", self.is_paused);
+            self.sim.toggle_pause();
         } else if code == KeyCode::KeyG && state.is_pressed() {
             let any = self.show_grid_xz || self.show_grid_xy || self.show_grid_yz;
             self.show_grid_xz = !any;
