@@ -1,3 +1,10 @@
+/// Loads a UTF-8 text file from a path (native) or URL (WASM).
+pub async fn load_str(path: &str) -> miette::Result<String> {
+    use miette::IntoDiagnostic;
+    let bytes = load_bytes(path).await?;
+    String::from_utf8(bytes).into_diagnostic()
+}
+
 /// Loads raw bytes from a file path (native) or URL (WASM).
 ///
 /// On native the path is resolved relative to the working directory.

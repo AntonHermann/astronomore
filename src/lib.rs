@@ -4,6 +4,7 @@ mod grid;
 mod loader;
 mod mesh;
 mod scene;
+mod shader_loader;
 mod texture;
 
 use std::sync::Arc;
@@ -289,7 +290,9 @@ impl State {
 
         // ================= Render Pipeline =================
 
-        let shader = device.create_shader_module(wgpu::include_wgsl!("shaders/shader.wgsl"));
+        let shader_src = loader::load_str("src/shaders/shader.wgsl").await?;
+        shader_loader::validate_wgsl("shader.wgsl", &shader_src)?;
+        let shader = shader_loader::make_shader_module(&device, "shader.wgsl", &shader_src);
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
@@ -368,7 +371,9 @@ impl State {
         );
 
         // ================= Grid Pipeline =================
-        let grid_shader = device.create_shader_module(wgpu::include_wgsl!("shaders/grid.wgsl"));
+        let grid_src = loader::load_str("src/shaders/grid.wgsl").await?;
+        shader_loader::validate_wgsl("grid.wgsl", &grid_src)?;
+        let grid_shader = shader_loader::make_shader_module(&device, "grid.wgsl", &grid_src);
         let grid_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Grid Pipeline Layout"),
             bind_group_layouts: &[Some(&camera_bind_group_layout)],

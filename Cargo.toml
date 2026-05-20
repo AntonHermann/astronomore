@@ -20,6 +20,7 @@ winit = { version = "0.30.13", features = ["android-native-activity"] }
 bytemuck = { version = "1.25.0", features = ["derive"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg"] }
 glam = "0.32.1"
+naga = { version = "29.0.3", features = ["wgsl-in"] }
 web-time = "1"
 egui = "0.34"
 egui-wgpu = "0.34"
