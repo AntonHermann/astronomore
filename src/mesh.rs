@@ -5,6 +5,7 @@ use wgpu::util::DeviceExt;
 pub struct Vertex {
     position: [f32; 3],
     tex_coords: [f32; 2],
+    normal: [f32; 3],
 }
 
 impl Vertex {
@@ -26,6 +27,11 @@ impl Vertex {
                     shader_location: 1,
                     format: wgpu::VertexFormat::Float32x2,
                 },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 5]>() as wgpu::BufferAddress,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
             ],
         }
     }
@@ -34,12 +40,15 @@ impl std::fmt::Display for Vertex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "pos: [{:4.1} {:4.1} {:4.1}], uv: [{:4.3} {:4.3}]",
+            "pos: [{:4.1} {:4.1} {:4.1}], uv: [{:4.3} {:4.3}], normal: [{:4.3} {:4.3} {:4.3}]",
             self.position[0],
             self.position[1],
             self.position[2],
             self.tex_coords[0],
-            self.tex_coords[1]
+            self.tex_coords[1],
+            self.normal[0],
+            self.normal[1],
+            self.normal[2]
         )
     }
 }
@@ -79,11 +88,11 @@ impl Mesh {
     pub fn simple_pentagon(device: &wgpu::Device) -> Self {
         #[rustfmt::skip]
         let vertices: &[Vertex] = &[
-            Vertex { position: [-0.0868241 ,  0.49240386, 0.0], tex_coords: [0.4131759   , 0.00759614], }, // A
-            Vertex { position: [-0.49513406,  0.06958647, 0.0], tex_coords: [0.0048659444, 0.43041354], }, // B
-            Vertex { position: [-0.21918549, -0.44939706, 0.0], tex_coords: [0.28081453  , 0.949397  ], }, // C
-            Vertex { position: [ 0.35966998, -0.3473291 , 0.0], tex_coords: [0.85967     , 0.84732914], }, // D
-            Vertex { position: [ 0.44147372,  0.2347359 , 0.0], tex_coords: [0.9414737   , 0.2652641 ], }, // E
+            Vertex { position: [-0.0868241 ,  0.49240386, 0.0], tex_coords: [0.4131759   , 0.00759614], normal: [0.0, 0.0, 1.0] }, // A
+            Vertex { position: [-0.49513406,  0.06958647, 0.0], tex_coords: [0.0048659444, 0.43041354], normal: [0.0, 0.0, 1.0] }, // B
+            Vertex { position: [-0.21918549, -0.44939706, 0.0], tex_coords: [0.28081453  , 0.949397  ], normal: [0.0, 0.0, 1.0] }, // C
+            Vertex { position: [ 0.35966998, -0.3473291 , 0.0], tex_coords: [0.85967     , 0.84732914], normal: [0.0, 0.0, 1.0] }, // D
+            Vertex { position: [ 0.44147372,  0.2347359 , 0.0], tex_coords: [0.9414737   , 0.2652641 ], normal: [0.0, 0.0, 1.0] }, // E
         ];
 
         #[rustfmt::skip]
@@ -124,6 +133,7 @@ impl Mesh {
                 vertices.push(Vertex {
                     position: [lat.cos() * lon.cos(), lat.sin(), lat.cos() * lon.sin()],
                     tex_coords: [1.0 - lon / (2. * PI), 0.5 - lat / PI],
+                    normal: [lat.cos() * lon.cos(), lat.sin(), lat.cos() * lon.sin()],
                 });
             }
         }
@@ -154,10 +164,10 @@ impl Mesh {
     pub fn x_plane(device: &wgpu::Device) -> Self {
         #[rustfmt::skip]
         let vertices: &[Vertex] = &[
-            Vertex { position: [0., -1., -1.], tex_coords: [0.2, 0.2], }, // A
-            Vertex { position: [0.,  1., -1.], tex_coords: [0.2, 0.0], }, // B
-            Vertex { position: [0.,  1.,  1.], tex_coords: [0.0, 0.0], }, // C
-            Vertex { position: [0., -1.,  1.], tex_coords: [0.0, 0.2], }, // D
+            Vertex { position: [0., -1., -1.], tex_coords: [0.2, 0.2], normal: [-1.0, 0.0, 0.0] }, // A
+            Vertex { position: [0.,  1., -1.], tex_coords: [0.2, 0.0], normal: [-1.0, 0.0, 0.0] }, // B
+            Vertex { position: [0.,  1.,  1.], tex_coords: [0.0, 0.0], normal: [-1.0, 0.0, 0.0] }, // C
+            Vertex { position: [0., -1.,  1.], tex_coords: [0.0, 0.2], normal: [-1.0, 0.0, 0.0] }, // D
         ];
 
         #[rustfmt::skip]
@@ -171,10 +181,10 @@ impl Mesh {
     pub fn y_plane(device: &wgpu::Device) -> Self {
         #[rustfmt::skip]
         let vertices: &[Vertex] = &[
-            Vertex { position: [-1., 0., -1.], tex_coords: [0.8, 0.0], }, // A
-            Vertex { position: [ 1., 0., -1.], tex_coords: [1.0, 0.0], }, // B
-            Vertex { position: [ 1., 0.,  1.], tex_coords: [1.0, 0.2], }, // C
-            Vertex { position: [-1., 0.,  1.], tex_coords: [0.8, 0.2], }, // D
+            Vertex { position: [-1., 0., -1.], tex_coords: [0.8, 0.0], normal: [0.0, -1.0, 0.0] }, // A
+            Vertex { position: [ 1., 0., -1.], tex_coords: [1.0, 0.0], normal: [0.0, -1.0, 0.0] }, // B
+            Vertex { position: [ 1., 0.,  1.], tex_coords: [1.0, 0.2], normal: [0.0, -1.0, 0.0] }, // C
+            Vertex { position: [-1., 0.,  1.], tex_coords: [0.8, 0.2], normal: [0.0, -1.0, 0.0] }, // D
         ];
 
         #[rustfmt::skip]
@@ -188,10 +198,10 @@ impl Mesh {
     pub fn z_plane(device: &wgpu::Device) -> Self {
         #[rustfmt::skip]
         let vertices: &[Vertex] = &[
-            Vertex { position: [-1., -1., 0.], tex_coords: [0.8, 1.0], }, // A
-            Vertex { position: [ 1., -1., 0.], tex_coords: [1.0, 1.0], }, // B
-            Vertex { position: [ 1.,  1., 0.], tex_coords: [1.0, 0.8], }, // C
-            Vertex { position: [-1.,  1., 0.], tex_coords: [0.8, 0.8], }, // D
+            Vertex { position: [-1., -1., 0.], tex_coords: [0.8, 1.0], normal: [0.0, 0.0, -1.0] }, // A
+            Vertex { position: [ 1., -1., 0.], tex_coords: [1.0, 1.0], normal: [0.0, 0.0, -1.0] }, // B
+            Vertex { position: [ 1.,  1., 0.], tex_coords: [1.0, 0.8], normal: [0.0, 0.0, -1.0] }, // C
+            Vertex { position: [-1.,  1., 0.], tex_coords: [0.8, 0.8], normal: [0.0, 0.0, -1.0] }, // D
         ];
 
         #[rustfmt::skip]
