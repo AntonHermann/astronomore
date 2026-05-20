@@ -53,6 +53,7 @@ impl CelestialBody {
         name: &str,
         distance_from_parent: f32,
         radius: f32,
+        angular_velocity: f32,
         texture: texture::Texture,
         model_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
@@ -61,7 +62,7 @@ impl CelestialBody {
         let orbital_parameters = OrbitalParameters {
             parent_id: None,
             radius: distance_from_parent,
-            angular_velocity: 0.05,
+            angular_velocity,
         };
 
         let model_uniform = ModelUniform::new(&glam::Mat4::IDENTITY, &glam::Mat4::IDENTITY, radius);

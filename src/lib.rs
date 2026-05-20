@@ -200,6 +200,13 @@ impl State {
             "dbg.png",
             &texture_bind_group_layout,
         )?;
+        let sun_texture = texture::Texture::from_bytes(
+            &device,
+            &queue,
+            &diffuse_bytes,
+            "sun",
+            &texture_bind_group_layout,
+        )?;
         let earth_bytes = loader::load_bytes("assets/textures/2k_earth_daymap.jpg").await?;
         let earth_texture = texture::Texture::from_bytes(
             &device,
@@ -220,7 +227,7 @@ impl State {
         // ======= Camera setup =======
 
         let camera =
-            camera::Camera::new_fps((0.0, 5.0, 10.0), -90f32.to_radians(), -20f32.to_radians());
+            camera::Camera::new_fps((0.0, 8.0, 25.0), -90f32.to_radians(), -15f32.to_radians());
         let projection =
             camera::Projection::new(size.width, size.height, 45.0f32.to_radians(), 0.1, 100.0);
 
@@ -265,16 +272,29 @@ impl State {
 
         // ==================== Scene setup =====================
         let mut scene = scene::Scene::new(&device);
+        let sun_id = scene.add_celestial_body(
+            CelestialBody::new(
+                &device,
+                "Sun",
+                0.,
+                4.,
+                0.0,
+                sun_texture,
+                &scene.model_bind_group_layout,
+            ),
+            None,
+        );
         let earth_id = scene.add_celestial_body(
             CelestialBody::new(
                 &device,
                 "Earth",
-                0.,
+                10.,
                 1.,
+                0.2,
                 earth_texture,
                 &scene.model_bind_group_layout,
             ),
-            None,
+            Some(sun_id),
         );
         scene.add_celestial_body(
             CelestialBody::new(
@@ -282,6 +302,7 @@ impl State {
                 "Moon",
                 3.,
                 0.27,
+                0.5,
                 moon_texture,
                 &scene.model_bind_group_layout,
             ),
@@ -792,7 +813,7 @@ impl State {
         self.camera_controller.sensitivity = cam_sensitivity;
         if reset_camera {
             let camera::Camera::Fps(cam) = &mut self.camera;
-            cam.position = glam::Vec3::new(0.0, 5.0, 10.0);
+            cam.position = glam::Vec3::new(0.0, 8.0, 25.0);
             cam.yaw_rad = -90f32.to_radians();
             cam.pitch_rad = -20f32.to_radians();
         }
