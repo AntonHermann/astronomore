@@ -418,7 +418,7 @@ impl State {
             label: Some("Camera Bind Group"),
         });
 
-        let camera_controller = CameraController::new(4.0, 2.0);
+        let camera_controller = CameraController::new(0.5, 2.0);
 
         // ================= Depth Texture setup =================
         let depth_texture =
@@ -987,7 +987,7 @@ impl State {
                             });
                         ui.separator();
                         ui.add(
-                            egui::Slider::new(&mut cam_speed, 0.5..=30.0).text("Geschwindigkeit"),
+                            egui::Slider::new(&mut cam_speed, 0.05..=4.0).text("Geschwindigkeit"),
                         );
                         ui.add(
                             egui::Slider::new(&mut cam_sensitivity, 0.1..=5.0)
