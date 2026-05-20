@@ -563,6 +563,11 @@ impl State {
         self.last_frame_duration = dt;
         self.last_update = now;
 
+        if !self.is_paused {
+            self.sim_time += dt.as_secs_f64() * self.sim_time_multiplier;
+        }
+        self.scene.update(self.sim_time, &self.queue);
+
         // Alternatives for updating the camera:
         // 1. We can create a separate buffer and copy its contents to our camera_buffer
         //    The new buffer is known as a staging buffer.
@@ -585,11 +590,6 @@ impl State {
             0,
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
-
-        if !self.is_paused {
-            self.sim_time += dt.as_secs_f64() * self.sim_time_multiplier;
-        }
-        self.scene.update(self.sim_time, &self.queue);
     }
 
     pub fn render(&mut self) -> miette::Result<()> {
