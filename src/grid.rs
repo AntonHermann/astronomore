@@ -67,25 +67,61 @@ impl GridMesh {
         for i in -half_size..=half_size {
             let p = i as f32;
             // lines along Z (fixed X position)
-            let c = if i == 0 { RED } else { GRAY };
-            verts.push(ColorVertex {
-                position: [p, 0.0, -n],
-                color: c,
-            });
-            verts.push(ColorVertex {
-                position: [p, 0.0, n],
-                color: c,
-            });
+            if i == 0 {
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, -n],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, 0.0],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, 0.0],
+                    color: RED,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, n],
+                    color: RED,
+                });
+            } else {
+                verts.push(ColorVertex {
+                    position: [p, 0.0, -n],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [p, 0.0, n],
+                    color: GRAY,
+                });
+            }
             // lines along X (fixed Z position)
-            let c = if i == 0 { BLUE } else { GRAY };
-            verts.push(ColorVertex {
-                position: [-n, 0.0, p],
-                color: c,
-            });
-            verts.push(ColorVertex {
-                position: [n, 0.0, p],
-                color: c,
-            });
+            if i == 0 {
+                verts.push(ColorVertex {
+                    position: [-n, 0.0, 0.0],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, 0.0],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, 0.0],
+                    color: BLUE,
+                });
+                verts.push(ColorVertex {
+                    position: [n, 0.0, 0.0],
+                    color: BLUE,
+                });
+            } else {
+                verts.push(ColorVertex {
+                    position: [-n, 0.0, p],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [n, 0.0, p],
+                    color: GRAY,
+                });
+            }
         }
         Self::build(device, "Grid XZ", verts)
     }
@@ -97,25 +133,61 @@ impl GridMesh {
         for i in -half_size..=half_size {
             let p = i as f32;
             // lines along Y (fixed X position)
-            let c = if i == 0 { RED } else { GRAY };
-            verts.push(ColorVertex {
-                position: [p, -n, 0.0],
-                color: c,
-            });
-            verts.push(ColorVertex {
-                position: [p, n, 0.0],
-                color: c,
-            });
+            if i == 0 {
+                verts.push(ColorVertex {
+                    position: [0.0, -n, 0.0],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, 0.0],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, 0.0],
+                    color: RED,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, n, 0.0],
+                    color: RED,
+                });
+            } else {
+                verts.push(ColorVertex {
+                    position: [p, -n, 0.0],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [p, n, 0.0],
+                    color: GRAY,
+                });
+            }
             // lines along X (fixed Y position)
-            let c = if i == 0 { GREEN } else { GRAY };
-            verts.push(ColorVertex {
-                position: [-n, p, 0.0],
-                color: c,
-            });
-            verts.push(ColorVertex {
-                position: [n, p, 0.0],
-                color: c,
-            });
+            if i == 0 {
+                verts.push(ColorVertex {
+                    position: [-n, 0.0, 0.0],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, 0.0],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, 0.0],
+                    color: GREEN,
+                });
+                verts.push(ColorVertex {
+                    position: [n, 0.0, 0.0],
+                    color: GREEN,
+                });
+            } else {
+                verts.push(ColorVertex {
+                    position: [-n, p, 0.0],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [n, p, 0.0],
+                    color: GRAY,
+                });
+            }
         }
         Self::build(device, "Grid XY", verts)
     }
@@ -127,25 +199,61 @@ impl GridMesh {
         for i in -half_size..=half_size {
             let p = i as f32;
             // lines along Z (fixed Y position)
-            let c = if i == 0 { GREEN } else { GRAY };
-            verts.push(ColorVertex {
-                position: [0.0, p, -n],
-                color: c,
-            });
-            verts.push(ColorVertex {
-                position: [0.0, p, n],
-                color: c,
-            });
+            if i == 0 {
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, -n],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, 0.0],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, 0.0],
+                    color: GREEN,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, n],
+                    color: GREEN,
+                });
+            } else {
+                verts.push(ColorVertex {
+                    position: [0.0, p, -n],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, p, n],
+                    color: GRAY,
+                });
+            }
             // lines along Y (fixed Z position)
-            let c = if i == 0 { BLUE } else { GRAY };
-            verts.push(ColorVertex {
-                position: [0.0, -n, p],
-                color: c,
-            });
-            verts.push(ColorVertex {
-                position: [0.0, n, p],
-                color: c,
-            });
+            if i == 0 {
+                verts.push(ColorVertex {
+                    position: [0.0, -n, 0.0],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, 0.0],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, 0.0, 0.0],
+                    color: BLUE,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, n, 0.0],
+                    color: BLUE,
+                });
+            } else {
+                verts.push(ColorVertex {
+                    position: [0.0, -n, p],
+                    color: GRAY,
+                });
+                verts.push(ColorVertex {
+                    position: [0.0, n, p],
+                    color: GRAY,
+                });
+            }
         }
         Self::build(device, "Grid YZ", verts)
     }
