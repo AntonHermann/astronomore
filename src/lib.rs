@@ -3,6 +3,7 @@ mod celestial_body;
 mod grid;
 mod loader;
 mod mesh;
+mod planets;
 mod scene;
 mod shader_loader;
 mod texture;
@@ -327,29 +328,6 @@ impl State {
             "dbg.png",
             &texture_bind_group_layout,
         )?;
-        let sun_texture = texture::Texture::from_bytes(
-            &device,
-            &queue,
-            &diffuse_bytes,
-            "sun",
-            &texture_bind_group_layout,
-        )?;
-        let earth_bytes = loader::load_bytes("assets/textures/2k_earth_daymap.jpg").await?;
-        let earth_texture = texture::Texture::from_bytes(
-            &device,
-            &queue,
-            &earth_bytes,
-            "earth.jpg",
-            &texture_bind_group_layout,
-        )?;
-        let moon_bytes = loader::load_bytes("assets/textures/2k_moon.jpg").await?;
-        let moon_texture = texture::Texture::from_bytes(
-            &device,
-            &queue,
-            &moon_bytes,
-            "moon.jpg",
-            &texture_bind_group_layout,
-        )?;
 
         // ======= Camera setup =======
 
@@ -397,42 +375,32 @@ impl State {
 
         // ==================== Scene setup =====================
         let mut scene = scene::Scene::new(&device);
-        let sun_id = scene.add_celestial_body(
-            CelestialBody::new(
+        let mut body_ids: Vec<scene::BodyId> = Vec::with_capacity(planets::BODIES.len());
+        for def in planets::BODIES {
+            let bytes = loader::load_bytes(def.texture_path).await?;
+            let texture = texture::Texture::from_bytes(
                 &device,
-                "Sun",
-                0.,
-                4.,
-                0.0,
-                sun_texture,
-                &scene.model_bind_group_layout,
-            ),
-            None,
-        );
-        let earth_id = scene.add_celestial_body(
-            CelestialBody::new(
-                &device,
-                "Earth",
-                10.,
-                1.,
-                0.2,
-                earth_texture,
-                &scene.model_bind_group_layout,
-            ),
-            Some(sun_id),
-        );
-        scene.add_celestial_body(
-            CelestialBody::new(
-                &device,
-                "Moon",
-                3.,
-                0.27,
-                0.5,
-                moon_texture,
-                &scene.model_bind_group_layout,
-            ),
-            Some(earth_id),
-        );
+                &queue,
+                &bytes,
+                def.name,
+                &texture_bind_group_layout,
+            )?;
+            let parent_id = def.parent.map(|p| body_ids[p as usize]);
+            let id = scene.add_celestial_body(
+                CelestialBody::new(
+                    &device,
+                    def.name,
+                    def.distance_from_parent,
+                    def.radius,
+                    def.angular_velocity,
+                    texture,
+                    &scene.model_bind_group_layout,
+                ),
+                parent_id,
+            );
+            body_ids.push(id);
+        }
+        let sun_id = body_ids[planets::SolarSystemBody::Sun as usize];
 
         // let camera =
         //     camera::Camera::new_fps((0.0, 8.0, 25.0), -90f32.to_radians(), -15f32.to_radians());

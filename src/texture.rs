@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+
+use crate::loader;
 use image::GenericImageView;
 use miette::IntoDiagnostic;
 
@@ -10,6 +13,17 @@ pub struct Texture {
 }
 
 impl Texture {
+    /// Load texture from path. The path is also used as label.
+    pub async fn load_from_path(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        texture_path: &str,
+        bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> miette::Result<Self> {
+        let bytes = loader::load_bytes(texture_path).await?;
+        Self::from_bytes(device, queue, &bytes, texture_path, bind_group_layout)
+    }
+
     pub fn from_bytes(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
