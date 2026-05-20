@@ -158,6 +158,8 @@ pub struct CameraController {
     amount_backward: f32,
     amount_up: f32,
     amount_down: f32,
+    amount_zoom_in: f32,
+    amount_zoom_out: f32,
     rotate_horizontal: f32,
     rotate_vertical: f32,
     scroll: f32,
@@ -174,6 +176,8 @@ impl CameraController {
             amount_backward: 0.0,
             amount_up: 0.0,
             amount_down: 0.0,
+            amount_zoom_in: 0.0,
+            amount_zoom_out: 0.0,
             rotate_horizontal: 0.0,
             rotate_vertical: 0.0,
             scroll: 0.0,
@@ -207,6 +211,14 @@ impl CameraController {
             }
             KeyCode::ShiftLeft => {
                 self.amount_down = amount;
+                true
+            }
+            KeyCode::Equal | KeyCode::NumpadAdd => {
+                self.amount_zoom_in = amount;
+                true
+            }
+            KeyCode::Minus | KeyCode::NumpadSubtract => {
+                self.amount_zoom_out = amount;
                 true
             }
             _ => false,
@@ -270,13 +282,15 @@ impl CameraController {
             Camera::Orbit(camera) => {
                 camera.yaw_rad += self.rotate_horizontal * self.sensitivity * dt;
                 camera.pitch_rad += -self.rotate_vertical * self.sensitivity * dt;
+                camera.yaw_rad += (self.amount_right - self.amount_left) * self.speed * dt;
+                camera.pitch_rad += (self.amount_forward - self.amount_backward) * self.speed * dt;
                 camera.pitch_rad = camera.pitch_rad.clamp(-SAFE_FRAC_PI_2, SAFE_FRAC_PI_2);
                 self.rotate_horizontal = 0.0;
                 self.rotate_vertical = 0.0;
 
                 camera.dist += self.scroll * self.speed * self.sensitivity * dt;
                 self.scroll = 0.0;
-                camera.dist += (self.amount_backward - self.amount_forward) * self.speed * dt;
+                camera.dist += (self.amount_zoom_out - self.amount_zoom_in) * self.speed * dt;
                 camera.dist = camera.dist.max(0.1);
             }
         }

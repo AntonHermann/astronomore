@@ -455,7 +455,7 @@ impl State {
 
         // let camera =
         //     Camera::new_fps((0.0, 8.0, 25.0), -90f32.to_radians(), -15f32.to_radians());
-        let camera = Camera::new_orbit(sun_id, 30.0, 0f32.to_radians(), -35f32.to_radians());
+        let camera = Camera::new_orbit(sun_id, 30.0, 0f32.to_radians(), 30f32.to_radians());
         camera_uniform.update_view_proj(&camera, &projection, &scene);
 
         // ================= Render Pipeline =================
@@ -881,7 +881,7 @@ impl State {
                 }
                 ui.separator();
                 egui::CollapsingHeader::new("Gitternetz")
-                    .default_open(true)
+                    .default_open(false)
                     .show(ui, |ui| {
                         ui.label("G = alle umschalten");
                         let mut xz = show_grid_xz;
@@ -899,7 +899,7 @@ impl State {
                     });
                 ui.separator();
                 egui::CollapsingHeader::new("Kamera")
-                    .default_open(true)
+                    .default_open(false)
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
                             ui.label("Modus:");
