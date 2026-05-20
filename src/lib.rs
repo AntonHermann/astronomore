@@ -50,7 +50,6 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     is_surface_configured: bool,
     window: Arc<Window>,
-    start_time: web_time::Instant,
     last_update: web_time::Instant,
     last_frame_duration: web_time::Duration,
     render_pipeline: wgpu::RenderPipeline,
@@ -444,8 +443,6 @@ impl State {
             // mesh::Mesh::z_plane(&device),
         ];
 
-        let start_time = web_time::Instant::now();
-
         // ==================== egui setup ====================
         let egui_ctx = egui::Context::default();
         let egui_state = egui_winit::State::new(
@@ -469,8 +466,7 @@ impl State {
             config,
             is_surface_configured: false,
             window,
-            start_time,
-            last_update: start_time,
+            last_update: web_time::Instant::now(),
             last_frame_duration: web_time::Duration::ZERO,
             render_pipeline,
             wireframe_pipeline,
@@ -546,8 +542,7 @@ impl State {
         );
 
         if !self.is_paused {
-            self.sim_time =
-                now.duration_since(self.start_time).as_secs_f32() * self.sim_time_multiplier;
+            self.sim_time += dt.as_secs_f32() * self.sim_time_multiplier;
         }
         self.scene.update(self.sim_time, &self.queue);
     }
