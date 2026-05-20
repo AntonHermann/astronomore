@@ -53,9 +53,11 @@ pub struct State {
     window: Arc<Window>,
     last_update: web_time::Instant,
     last_frame_duration: web_time::Duration,
+    render_pipeline_layout: wgpu::PipelineLayout,
     render_pipeline: wgpu::RenderPipeline,
     wireframe_pipeline: wgpu::RenderPipeline,
     wireframe: bool,
+    grid_pipeline_layout: wgpu::PipelineLayout,
     grid_pipeline: wgpu::RenderPipeline,
     grid_xz: GridMesh,
     grid_xy: GridMesh,
@@ -82,6 +84,125 @@ pub struct State {
     egui_ctx: egui::Context,
     egui_state: egui_winit::State,
     egui_renderer: egui_wgpu::Renderer,
+}
+
+fn build_main_pipelines(
+    device: &wgpu::Device,
+    layout: &wgpu::PipelineLayout,
+    module: &wgpu::ShaderModule,
+    surface_format: wgpu::TextureFormat,
+) -> (wgpu::RenderPipeline, wgpu::RenderPipeline) {
+    let make = |polygon_mode: wgpu::PolygonMode, label: &str, fs_entry: &'static str| {
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some(label),
+            layout: Some(layout),
+            vertex: wgpu::VertexState {
+                module,
+                entry_point: Some("vs_main"),
+                buffers: &[Vertex::desc()],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module,
+                entry_point: Some(fs_entry),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: surface_format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: texture::Texture::DEPTH_FORMAT,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::Less),
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview_mask: None,
+            cache: None,
+        })
+    };
+
+    let fill = make(wgpu::PolygonMode::Fill, "Fill Pipeline", "fs_main");
+    #[cfg(not(target_arch = "wasm32"))]
+    let wire = make(
+        wgpu::PolygonMode::Line,
+        "Wireframe Pipeline",
+        "fs_wireframe",
+    );
+    #[cfg(target_arch = "wasm32")]
+    let wire = make(
+        wgpu::PolygonMode::Fill,
+        "Wireframe Pipeline",
+        "fs_wireframe",
+    );
+    (fill, wire)
+}
+
+fn build_grid_pipeline(
+    device: &wgpu::Device,
+    layout: &wgpu::PipelineLayout,
+    module: &wgpu::ShaderModule,
+    surface_format: wgpu::TextureFormat,
+) -> wgpu::RenderPipeline {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("Grid Pipeline"),
+        layout: Some(layout),
+        vertex: wgpu::VertexState {
+            module,
+            entry_point: Some("vs_main"),
+            buffers: &[ColorVertex::desc()],
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module,
+            entry_point: Some("fs_main"),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: surface_format,
+                blend: Some(wgpu::BlendState::REPLACE),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+        }),
+        primitive: wgpu::PrimitiveState {
+            topology: wgpu::PrimitiveTopology::LineList,
+            strip_index_format: None,
+            front_face: wgpu::FrontFace::Ccw,
+            cull_mode: None,
+            polygon_mode: wgpu::PolygonMode::Fill,
+            unclipped_depth: false,
+            conservative: false,
+        },
+        depth_stencil: Some(wgpu::DepthStencilState {
+            format: texture::Texture::DEPTH_FORMAT,
+            depth_write_enabled: Some(true),
+            depth_compare: Some(wgpu::CompareFunction::Less),
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
+        }),
+        multisample: wgpu::MultisampleState {
+            count: 1,
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        },
+        multiview_mask: None,
+        cache: None,
+    })
 }
 
 impl State {
@@ -325,71 +446,8 @@ impl State {
                 immediate_size: 0,
             });
 
-        let make_pipeline =
-            |polygon_mode: wgpu::PolygonMode, label: &str, fs_entry: &'static str| {
-                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some(label),
-                    layout: Some(&render_pipeline_layout),
-                    vertex: wgpu::VertexState {
-                        module: &shader,
-                        entry_point: Some("vs_main"),
-                        buffers: &[Vertex::desc()],
-                        compilation_options: wgpu::PipelineCompilationOptions::default(),
-                    },
-                    fragment: Some(wgpu::FragmentState {
-                        module: &shader,
-                        entry_point: Some(fs_entry),
-                        targets: &[Some(wgpu::ColorTargetState {
-                            format: config.format,
-                            blend: Some(wgpu::BlendState::REPLACE),
-                            write_mask: wgpu::ColorWrites::ALL,
-                        })],
-                        compilation_options: wgpu::PipelineCompilationOptions::default(),
-                    }),
-                    primitive: wgpu::PrimitiveState {
-                        topology: wgpu::PrimitiveTopology::TriangleList,
-                        strip_index_format: None,
-                        front_face: wgpu::FrontFace::Ccw,
-                        cull_mode: Some(wgpu::Face::Back),
-                        polygon_mode,
-                        unclipped_depth: false,
-                        conservative: false,
-                    },
-                    depth_stencil: Some(wgpu::DepthStencilState {
-                        format: texture::Texture::DEPTH_FORMAT,
-                        depth_write_enabled: Some(true),
-                        // The depth_compare function tells us when to discard a new pixel. Using LESS means pixels will be drawn front to back.
-                        depth_compare: Some(wgpu::CompareFunction::Less),
-                        // There's another type of buffer called a stencil buffer.
-                        // It's common practice to store the stencil buffer and depth buffer in the same texture.
-                        // These fields control values for stencil testing. We'll use default values since we aren't using a stencil buffer.
-                        // We'll cover stencil buffers later.
-                        stencil: wgpu::StencilState::default(),
-                        bias: wgpu::DepthBiasState::default(),
-                    }),
-                    multisample: wgpu::MultisampleState {
-                        count: 1,
-                        mask: !0,
-                        alpha_to_coverage_enabled: false,
-                    },
-                    multiview_mask: None,
-                    cache: None,
-                })
-            };
-
-        let render_pipeline = make_pipeline(wgpu::PolygonMode::Fill, "Fill Pipeline", "fs_main");
-        #[cfg(not(target_arch = "wasm32"))]
-        let wireframe_pipeline = make_pipeline(
-            wgpu::PolygonMode::Line,
-            "Wireframe Pipeline",
-            "fs_wireframe",
-        );
-        #[cfg(target_arch = "wasm32")]
-        let wireframe_pipeline = make_pipeline(
-            wgpu::PolygonMode::Fill,
-            "Wireframe Pipeline",
-            "fs_wireframe",
-        );
+        let (render_pipeline, wireframe_pipeline) =
+            build_main_pipelines(&device, &render_pipeline_layout, &shader, config.format);
 
         // ================= Grid Pipeline =================
         let grid_src = loader::load_str("src/shaders/grid.wgsl").await?;
@@ -400,49 +458,8 @@ impl State {
             bind_group_layouts: &[Some(&camera_bind_group_layout)],
             immediate_size: 0,
         });
-        let grid_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Grid Pipeline"),
-            layout: Some(&grid_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &grid_shader,
-                entry_point: Some("vs_main"),
-                buffers: &[ColorVertex::desc()],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &grid_shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: texture::Texture::DEPTH_FORMAT,
-                depth_write_enabled: Some(true),
-                depth_compare: Some(wgpu::CompareFunction::Less),
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview_mask: None,
-            cache: None,
-        });
+        let grid_pipeline =
+            build_grid_pipeline(&device, &grid_pipeline_layout, &grid_shader, config.format);
 
         let grid_xz = GridMesh::xz_plane(&device, 10);
         let grid_xy = GridMesh::xy_plane(&device, 10);
@@ -494,9 +511,11 @@ impl State {
             window,
             last_update: web_time::Instant::now(),
             last_frame_duration: web_time::Duration::ZERO,
+            render_pipeline_layout,
             render_pipeline,
             wireframe_pipeline,
             wireframe: false,
+            grid_pipeline_layout,
             grid_pipeline,
             grid_xz,
             grid_xy,
@@ -902,12 +921,73 @@ impl State {
             self.camera_controller.handle_key(code, state);
         }
     }
+
+    /// Reloads `shader.wgsl` from disk and recreates the main render pipelines.
+    ///
+    /// On validation error the miette diagnostic is printed to stderr and the
+    /// existing pipelines are left unchanged.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn try_reload_main_shader(&mut self) {
+        let src = match std::fs::read_to_string("src/shaders/shader.wgsl") {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("shader.wgsl lesen fehlgeschlagen: {e}");
+                return;
+            }
+        };
+        match shader_loader::validate_wgsl("shader.wgsl", &src) {
+            Ok(()) => {
+                let module = shader_loader::make_shader_module(&self.device, "shader.wgsl", &src);
+                (self.render_pipeline, self.wireframe_pipeline) = build_main_pipelines(
+                    &self.device,
+                    &self.render_pipeline_layout,
+                    &module,
+                    self.config.format,
+                );
+                tracing::info!("shader.wgsl neu geladen");
+            }
+            Err(e) => eprintln!("{e:?}"),
+        }
+    }
+
+    /// Reloads `grid.wgsl` from disk and recreates the grid render pipeline.
+    ///
+    /// On validation error the miette diagnostic is printed to stderr and the
+    /// existing pipeline is left unchanged.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn try_reload_grid_shader(&mut self) {
+        let src = match std::fs::read_to_string("src/shaders/grid.wgsl") {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("grid.wgsl lesen fehlgeschlagen: {e}");
+                return;
+            }
+        };
+        match shader_loader::validate_wgsl("grid.wgsl", &src) {
+            Ok(()) => {
+                let module = shader_loader::make_shader_module(&self.device, "grid.wgsl", &src);
+                self.grid_pipeline = build_grid_pipeline(
+                    &self.device,
+                    &self.grid_pipeline_layout,
+                    &module,
+                    self.config.format,
+                );
+                tracing::info!("grid.wgsl neu geladen");
+            }
+            Err(e) => eprintln!("{e:?}"),
+        }
+    }
 }
 
 pub struct App {
     #[cfg(target_arch = "wasm32")]
     proxy: Option<winit::event_loop::EventLoopProxy<State>>,
     state: Option<State>,
+    #[cfg(not(target_arch = "wasm32"))]
+    shader_rx: Option<std::sync::mpsc::Receiver<std::path::PathBuf>>,
+    #[cfg(not(target_arch = "wasm32"))]
+    _debouncer:
+        Option<notify_debouncer_mini::Debouncer<notify_debouncer_mini::notify::RecommendedWatcher>>,
 }
 
 impl App {
@@ -918,6 +998,10 @@ impl App {
             state: None,
             #[cfg(target_arch = "wasm32")]
             proxy,
+            #[cfg(not(target_arch = "wasm32"))]
+            shader_rx: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            _debouncer: None,
         }
     }
 }
@@ -953,6 +1037,30 @@ impl ApplicationHandler<State> for App {
         #[cfg(not(target_arch = "wasm32"))]
         {
             self.state = Some(pollster::block_on(State::new(window)).unwrap());
+
+            let (tx, rx) = std::sync::mpsc::channel();
+            let mut debouncer = notify_debouncer_mini::new_debouncer(
+                std::time::Duration::from_millis(150),
+                move |res: notify_debouncer_mini::DebounceEventResult| {
+                    if let Ok(events) = res {
+                        for event in events {
+                            if event.kind == notify_debouncer_mini::DebouncedEventKind::Any {
+                                let _ = tx.send(event.path);
+                            }
+                        }
+                    }
+                },
+            )
+            .expect("Shader-Watcher konnte nicht gestartet werden");
+            debouncer
+                .watcher()
+                .watch(
+                    std::path::Path::new("src/shaders"),
+                    notify_debouncer_mini::notify::RecursiveMode::NonRecursive,
+                )
+                .expect("src/shaders kann nicht beobachtet werden");
+            self._debouncer = Some(debouncer);
+            self.shader_rx = Some(rx);
         }
 
         #[cfg(target_arch = "wasm32")]
@@ -1048,6 +1156,31 @@ impl ApplicationHandler<State> for App {
                 ..
             } if !egui_consumed => state.mouse_pressed = mouse_state.is_pressed(),
             _ => {}
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        let Some(rx) = &self.shader_rx else { return };
+        let Some(state) = &mut self.state else { return };
+
+        let mut reload_main = false;
+        let mut reload_grid = false;
+        while let Ok(path) = rx.try_recv() {
+            match path.file_name().and_then(|n| n.to_str()) {
+                Some("shader.wgsl") => reload_main = true,
+                Some("grid.wgsl") => reload_grid = true,
+                _ => {}
+            }
+        }
+        if reload_main {
+            state.try_reload_main_shader();
+        }
+        if reload_grid {
+            state.try_reload_grid_shader();
+        }
+        if reload_main || reload_grid {
+            state.window.request_redraw();
         }
     }
 }
