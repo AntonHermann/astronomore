@@ -96,7 +96,7 @@ impl Scene {
         let mut curr_id = body_id.0;
         let mut orbital_transform = self.celestial_bodies[curr_id].orbital_transform;
         while let Some(parent_id) = self.celestial_bodies[curr_id].orbital_parameters.parent_id {
-            let relative_parent_transform = self.celestial_bodies[curr_id].orbital_transform;
+            let relative_parent_transform = self.celestial_bodies[parent_id].orbital_transform;
             orbital_transform = relative_parent_transform * orbital_transform;
             curr_id = parent_id;
         }
