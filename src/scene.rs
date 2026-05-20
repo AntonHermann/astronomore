@@ -2,7 +2,7 @@ use crate::celestial_body::CelestialBody;
 
 /// Index of a celestial body in the scene's celestial_bodies list.
 /// Can only be constructed by the scene when adding a celestial body, and is used to reference celestial bodies (e.g. as parents in orbital parameters) without exposing the internal list structure of the scene.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct BodyId(usize);
 
 pub struct Scene {
@@ -88,6 +88,15 @@ impl Scene {
                 bytemuck::cast_slice(&[self.celestial_bodies[i].model_uniform]),
             );
         }
+    }
+
+    /// Iterate over all bodies in the scene, yielding `(BodyId, name)` pairs.
+    /// Useful for building UI selectors without exposing the internal index.
+    pub fn iter_bodies(&self) -> impl Iterator<Item = (BodyId, &str)> {
+        self.celestial_bodies
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (BodyId(i), b.name.as_str()))
     }
 
     /// Iterate through ancestor chain until root body is reached,

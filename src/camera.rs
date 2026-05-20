@@ -89,8 +89,9 @@ impl OrbitCamera {
 
     /// Transform from `target` to `camera` (world space)
     pub fn relative_camera_transform(&self) -> glam::Mat4 {
-        let camera_rotation =
-            glam::Mat4::from_rotation_y(self.yaw_rad) * glam::Mat4::from_rotation_x(self.pitch_rad);
+        // Negate pitch so positive pitch lifts the camera above the target (elevation convention).
+        let camera_rotation = glam::Mat4::from_rotation_y(self.yaw_rad)
+            * glam::Mat4::from_rotation_x(-self.pitch_rad);
         let camera_translation = glam::Mat4::from_translation(glam::Vec3::new(0.0, 0.0, self.dist));
         camera_rotation * camera_translation
     }
@@ -267,8 +268,16 @@ impl CameraController {
                 camera.pitch_rad = camera.pitch_rad.clamp(-SAFE_FRAC_PI_2, SAFE_FRAC_PI_2);
             }
             Camera::Orbit(camera) => {
+                camera.yaw_rad += self.rotate_horizontal * self.sensitivity * dt;
+                camera.pitch_rad += -self.rotate_vertical * self.sensitivity * dt;
+                camera.pitch_rad = camera.pitch_rad.clamp(-SAFE_FRAC_PI_2, SAFE_FRAC_PI_2);
+                self.rotate_horizontal = 0.0;
+                self.rotate_vertical = 0.0;
+
+                camera.dist += self.scroll * self.speed * self.sensitivity * dt;
+                self.scroll = 0.0;
                 camera.dist += (self.amount_backward - self.amount_forward) * self.speed * dt;
-                // TODO: implement the rest
+                camera.dist = camera.dist.max(0.1);
             }
         }
     }

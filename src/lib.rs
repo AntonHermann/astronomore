@@ -781,14 +781,24 @@ impl State {
             Camera::Orbit(camera) => camera.target_and_camera_pos(&self.scene).1,
         };
         let cam_is_fps = matches!(&self.camera, Camera::Fps(_));
+        let body_list: Vec<(scene::BodyId, String)> = self
+            .scene
+            .iter_bodies()
+            .map(|(id, n)| (id, n.to_string()))
+            .collect();
+        let default_target = body_list.first().expect("scene has at least one body").0;
+        let mut selected_is_fps = cam_is_fps;
+        // Defaults for whichever mode is not currently active, so the UI shows
+        // coherent values immediately when the user toggles the mode.
         let mut fps_pos_x = 0.0f32;
-        let mut fps_pos_y = 0.0f32;
-        let mut fps_pos_z = 0.0f32;
-        let mut fps_yaw_deg = 0.0f32;
-        let mut fps_pitch_deg = 0.0f32;
-        let mut orbit_dist = 0.0f32;
+        let mut fps_pos_y = 8.0f32;
+        let mut fps_pos_z = 25.0f32;
+        let mut fps_yaw_deg = -90.0f32;
+        let mut fps_pitch_deg = -20.0f32;
+        let mut orbit_dist = 25.0f32;
         let mut orbit_yaw_deg = 0.0f32;
         let mut orbit_pitch_deg = 0.0f32;
+        let mut selected_target = default_target;
         match &self.camera {
             Camera::Fps(c) => {
                 fps_pos_x = c.position.x;
@@ -801,6 +811,7 @@ impl State {
                 orbit_dist = c.dist;
                 orbit_yaw_deg = c.yaw_rad.to_degrees();
                 orbit_pitch_deg = c.pitch_rad.to_degrees();
+                selected_target = c.target;
             }
         }
 
@@ -890,17 +901,17 @@ impl State {
                 egui::CollapsingHeader::new("Kamera")
                     .default_open(true)
                     .show(ui, |ui| {
-                        ui.label(if cam_is_fps {
-                            "Modus: FPS"
-                        } else {
-                            "Modus: Orbit"
+                        ui.horizontal(|ui| {
+                            ui.label("Modus:");
+                            ui.radio_value(&mut selected_is_fps, true, "FPS");
+                            ui.radio_value(&mut selected_is_fps, false, "Orbit");
                         });
                         ui.separator();
                         egui::Grid::new("cam_params")
                             .num_columns(2)
                             .striped(true)
                             .show(ui, |ui| {
-                                if cam_is_fps {
+                                if selected_is_fps {
                                     ui.label("X:");
                                     ui.add(egui::DragValue::new(&mut fps_pos_x).speed(0.1));
                                     ui.end_row();
@@ -926,6 +937,24 @@ impl State {
                                     );
                                     ui.end_row();
                                 } else {
+                                    ui.label("Ziel:");
+                                    let selected_text = body_list
+                                        .iter()
+                                        .find(|(id, _)| *id == selected_target)
+                                        .map(|(_, n)| n.as_str())
+                                        .unwrap_or("");
+                                    egui::ComboBox::from_id_salt("orbit_target")
+                                        .selected_text(selected_text)
+                                        .show_ui(ui, |ui| {
+                                            for (id, name) in &body_list {
+                                                ui.selectable_value(
+                                                    &mut selected_target,
+                                                    *id,
+                                                    name,
+                                                );
+                                            }
+                                        });
+                                    ui.end_row();
                                     ui.label("Abstand:");
                                     ui.add(
                                         egui::DragValue::new(&mut orbit_dist)
@@ -994,12 +1023,17 @@ impl State {
         }
         self.camera_controller.speed = cam_speed;
         self.camera_controller.sensitivity = cam_sensitivity;
-        if reset_camera {
-            self.camera = Camera::Fps(camera::FpsCamera::new(
-                glam::Vec3::new(0.0, 8.0, 25.0),
-                -90f32.to_radians(),
-                -20f32.to_radians(),
-            ));
+        let mode_switched = selected_is_fps != cam_is_fps;
+        if mode_switched || reset_camera {
+            self.camera = if selected_is_fps {
+                Camera::new_fps(
+                    glam::Vec3::new(0.0, 8.0, 25.0),
+                    -90f32.to_radians(),
+                    -20f32.to_radians(),
+                )
+            } else {
+                Camera::new_orbit(selected_target, 25.0, 0.0, 0.0)
+            };
         } else {
             match &mut self.camera {
                 Camera::Fps(c) => {
@@ -1008,6 +1042,7 @@ impl State {
                     c.pitch_rad = fps_pitch_deg.to_radians();
                 }
                 Camera::Orbit(c) => {
+                    c.target = selected_target;
                     c.dist = orbit_dist;
                     c.yaw_rad = orbit_yaw_deg.to_radians();
                     c.pitch_rad = orbit_pitch_deg.to_radians();
