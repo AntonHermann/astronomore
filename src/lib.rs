@@ -45,7 +45,8 @@ impl CameraUniform {
         projection: &camera::Projection,
         scene: &scene::Scene,
     ) {
-        self.view_proj = (projection.calc_matrix() * camera.calc_matrix(scene)).to_cols_array_2d();
+        self.view_proj = (projection.cam_to_clip_matrix() * camera.world_to_cam_matrix(scene))
+            .to_cols_array_2d();
     }
 }
 

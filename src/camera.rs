@@ -31,10 +31,10 @@ impl Camera {
     }
 
     /// Calculate the view matrix for this camera. This is the transform that transforms world space to camera space.
-    pub fn calc_matrix(&self, scene: &Scene) -> glam::Mat4 {
+    pub fn world_to_cam_matrix(&self, scene: &Scene) -> glam::Mat4 {
         match self {
-            Camera::Fps(camera) => camera.calc_matrix(),
-            Camera::Orbit(camera) => camera.calc_matrix(scene),
+            Camera::Fps(camera) => camera.world_to_cam_matrix(),
+            Camera::Orbit(camera) => camera.world_to_cam_matrix(scene),
         }
     }
 }
@@ -56,7 +56,7 @@ impl FpsCamera {
     }
 
     /// Calculate the view matrix for this camera. This is the transform that transforms world space to camera space.
-    pub fn calc_matrix(&self) -> glam::Mat4 {
+    pub fn world_to_cam_matrix(&self) -> glam::Mat4 {
         let (sin_pitch, cos_pitch) = self.pitch_rad.sin_cos();
         let (sin_yaw, cos_yaw) = self.yaw_rad.sin_cos();
         glam::Mat4::look_to_rh(
@@ -87,7 +87,7 @@ impl OrbitCamera {
         }
     }
 
-    /// Transform from `target` to `camera`
+    /// Transform from `target` to `camera` (world space)
     pub fn relative_camera_transform(&self) -> glam::Mat4 {
         let camera_rotation =
             glam::Mat4::from_rotation_y(self.yaw_rad) * glam::Mat4::from_rotation_x(self.pitch_rad);
@@ -105,7 +105,7 @@ impl OrbitCamera {
     }
 
     /// Calculate the view matrix for this camera. This is the transform that transforms world space to camera space.
-    pub fn calc_matrix(&self, scene: &Scene) -> glam::Mat4 {
+    pub fn world_to_cam_matrix(&self, scene: &Scene) -> glam::Mat4 {
         // let (sin_pitch, cos_pitch) = self.pitch_rad.sin_cos();
         // let (sin_yaw, cos_yaw) = self.yaw_rad.sin_cos();
 
@@ -140,7 +140,10 @@ impl Projection {
         self.aspect_ratio = width as f32 / height as f32;
     }
 
-    pub fn calc_matrix(&self) -> glam::Mat4 {
+    /// Calculate the projection matrix that transforms camera space to clip space.
+    /// Combines a right-handed perspective projection with `OPENGL_TO_WGPU_MATRIX`
+    /// to remap OpenGL's `[-1, 1]` z-range to wgpu's `[0, 1]` convention.
+    pub fn cam_to_clip_matrix(&self) -> glam::Mat4 {
         OPENGL_TO_WGPU_MATRIX
             * glam::Mat4::perspective_rh(self.fov_y_rad, self.aspect_ratio, self.z_near, self.z_far)
     }
