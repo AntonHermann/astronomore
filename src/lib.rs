@@ -25,9 +25,12 @@ use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::EventLoopExtWebSys;
 
-use crate::celestial_body::{CelestialBody, DrawCelestialBody};
 use crate::grid::{ColorVertex, DrawGrid, GridMesh};
 use crate::mesh::{DrawMesh, Vertex};
+use crate::{
+    camera::{Camera, CameraController, Projection},
+    celestial_body::{CelestialBody, DrawCelestialBody},
+};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -40,12 +43,7 @@ impl CameraUniform {
             view_proj: glam::Mat4::IDENTITY.to_cols_array_2d(),
         }
     }
-    fn update_view_proj(
-        &mut self,
-        camera: &camera::Camera,
-        projection: &camera::Projection,
-        scene: &scene::Scene,
-    ) {
+    fn update_view_proj(&mut self, camera: &Camera, projection: &Projection, scene: &scene::Scene) {
         self.view_proj = (projection.cam_to_clip_matrix() * camera.world_to_cam_matrix(scene))
             .to_cols_array_2d();
     }
@@ -80,12 +78,12 @@ pub struct State {
     sim_time: f64,
     sim_time_multiplier: f64,
     is_paused: bool,
-    camera: camera::Camera,
-    projection: camera::Projection,
+    camera: Camera,
+    projection: Projection,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
-    camera_controller: camera::CameraController,
+    camera_controller: CameraController,
     mouse_pressed: bool,
     depth_texture: texture::Texture,
     egui_ctx: egui::Context,
@@ -331,8 +329,7 @@ impl State {
 
         // ======= Camera setup =======
 
-        let projection =
-            camera::Projection::new(size.width, size.height, 45.0f32.to_radians(), 0.1, 100.0);
+        let projection = Projection::new(size.width, size.height, 45.0f32.to_radians(), 0.1, 100.0);
 
         let mut camera_uniform = CameraUniform::new();
         // camera creation and update_view_proj() called later, after scene was created
@@ -367,7 +364,7 @@ impl State {
             label: Some("Camera Bind Group"),
         });
 
-        let camera_controller = camera::CameraController::new(4.0, 2.0);
+        let camera_controller = CameraController::new(4.0, 2.0);
 
         // ================= Depth Texture setup =================
         let depth_texture =
@@ -403,8 +400,8 @@ impl State {
         let sun_id = body_ids[planets::SolarSystemBody::Sun as usize];
 
         // let camera =
-        //     camera::Camera::new_fps((0.0, 8.0, 25.0), -90f32.to_radians(), -15f32.to_radians());
-        let camera = camera::Camera::new_orbit(sun_id, 25.0, 0f32.to_radians(), 0f32.to_radians());
+        //     Camera::new_fps((0.0, 8.0, 25.0), -90f32.to_radians(), -15f32.to_radians());
+        let camera = Camera::new_orbit(sun_id, 30.0, 0f32.to_radians(), -35f32.to_radians());
         camera_uniform.update_view_proj(&camera, &projection, &scene);
 
         // ================= Render Pipeline =================
@@ -693,10 +690,10 @@ impl State {
         let mut cam_sensitivity = self.camera_controller.sensitivity;
         let mut reset_camera = false;
         let cam_pos = match &self.camera {
-            camera::Camera::Fps(camera) => camera.position,
-            camera::Camera::Orbit(camera) => camera.target_and_camera_pos(&self.scene).1,
+            Camera::Fps(camera) => camera.position,
+            Camera::Orbit(camera) => camera.target_and_camera_pos(&self.scene).1,
         };
-        let cam_is_fps = matches!(&self.camera, camera::Camera::Fps(_));
+        let cam_is_fps = matches!(&self.camera, Camera::Fps(_));
         let mut fps_pos_x = 0.0f32;
         let mut fps_pos_y = 0.0f32;
         let mut fps_pos_z = 0.0f32;
@@ -706,14 +703,14 @@ impl State {
         let mut orbit_yaw_deg = 0.0f32;
         let mut orbit_pitch_deg = 0.0f32;
         match &self.camera {
-            camera::Camera::Fps(c) => {
+            Camera::Fps(c) => {
                 fps_pos_x = c.position.x;
                 fps_pos_y = c.position.y;
                 fps_pos_z = c.position.z;
                 fps_yaw_deg = c.yaw_rad.to_degrees();
                 fps_pitch_deg = c.pitch_rad.to_degrees();
             }
-            camera::Camera::Orbit(c) => {
+            Camera::Orbit(c) => {
                 orbit_dist = c.dist;
                 orbit_yaw_deg = c.yaw_rad.to_degrees();
                 orbit_pitch_deg = c.pitch_rad.to_degrees();
@@ -896,19 +893,19 @@ impl State {
         self.camera_controller.speed = cam_speed;
         self.camera_controller.sensitivity = cam_sensitivity;
         if reset_camera {
-            self.camera = camera::Camera::Fps(camera::FpsCamera::new(
+            self.camera = Camera::Fps(camera::FpsCamera::new(
                 glam::Vec3::new(0.0, 8.0, 25.0),
                 -90f32.to_radians(),
                 -20f32.to_radians(),
             ));
         } else {
             match &mut self.camera {
-                camera::Camera::Fps(c) => {
+                Camera::Fps(c) => {
                     c.position = glam::Vec3::new(fps_pos_x, fps_pos_y, fps_pos_z);
                     c.yaw_rad = fps_yaw_deg.to_radians();
                     c.pitch_rad = fps_pitch_deg.to_radians();
                 }
-                camera::Camera::Orbit(c) => {
+                Camera::Orbit(c) => {
                     c.dist = orbit_dist;
                     c.yaw_rad = orbit_yaw_deg.to_radians();
                     c.pitch_rad = orbit_pitch_deg.to_radians();
