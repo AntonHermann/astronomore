@@ -2,6 +2,7 @@ use crate::celestial_body::CelestialBody;
 
 /// Index of a celestial body in the scene's celestial_bodies list.
 /// Can only be constructed by the scene when adding a celestial body, and is used to reference celestial bodies (e.g. as parents in orbital parameters) without exposing the internal list structure of the scene.
+#[derive(Debug, Copy, Clone)]
 pub struct BodyId(usize);
 
 pub struct Scene {
@@ -87,5 +88,18 @@ impl Scene {
                 bytemuck::cast_slice(&[self.celestial_bodies[i].model_uniform]),
             );
         }
+    }
+
+    /// Iterate through ancestor chain until root body is reached,
+    /// multiply parent transform (relative to its parent) to the left of current transform
+    pub fn get_body_orbital_transform(&self, body_id: BodyId) -> glam::Mat4 {
+        let mut curr_id = body_id.0;
+        let mut orbital_transform = self.celestial_bodies[curr_id].orbital_transform;
+        while let Some(parent_id) = self.celestial_bodies[curr_id].orbital_parameters.parent_id {
+            let relative_parent_transform = self.celestial_bodies[curr_id].orbital_transform;
+            orbital_transform = relative_parent_transform * orbital_transform;
+            curr_id = parent_id;
+        }
+        orbital_transform
     }
 }
