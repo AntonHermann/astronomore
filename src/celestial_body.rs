@@ -96,8 +96,8 @@ impl CelestialBody {
         }
     }
 
-    /// TODO: change from Duration to sim_time
-    pub fn update(&mut self, sim_time: f32) {
+    pub fn update(&mut self, sim_time: f64) {
+        let sim_time = sim_time as f32;
         let angle = self.orbital_parameters.angular_velocity * sim_time;
         let pos = glam::Vec3::new(
             self.orbital_parameters.radius * angle.cos(),
@@ -106,7 +106,6 @@ impl CelestialBody {
         );
         self.orbital_transform = glam::Mat4::from_translation(pos);
 
-        // rotate 0.1 radians per second around the y-axis
         self.spin_transform = glam::Mat4::from_rotation_y(0.1 * sim_time);
     }
 

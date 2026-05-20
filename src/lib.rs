@@ -68,8 +68,8 @@ pub struct State {
     // diffuse_bind_group: wgpu::BindGroup,
     identity_model_bind_group: wgpu::BindGroup,
     scene: scene::Scene,
-    sim_time: f32,
-    sim_time_multiplier: f32,
+    sim_time: f64,
+    sim_time_multiplier: f64,
     is_paused: bool,
     camera: camera::Camera,
     projection: camera::Projection,
@@ -508,8 +508,8 @@ impl State {
             identity_model_bind_group,
             diffuse_texture,
             scene,
-            sim_time: 0.0,
-            sim_time_multiplier: 1.0,
+            sim_time: 0.0f64,
+            sim_time_multiplier: 1.0f64,
             is_paused: false,
             camera,
             projection,
@@ -568,7 +568,7 @@ impl State {
         );
 
         if !self.is_paused {
-            self.sim_time += dt.as_secs_f32() * self.sim_time_multiplier;
+            self.sim_time += dt.as_secs_f64() * self.sim_time_multiplier;
         }
         self.scene.update(self.sim_time, &self.queue);
     }
@@ -686,7 +686,7 @@ impl State {
         let wireframe = self.wireframe;
         let mut toggle_pause = false;
         let mut toggle_wireframe = false;
-        let mut new_multiplier: Option<f32> = None;
+        let mut new_multiplier: Option<f64> = None;
         let show_grid_xz = self.show_grid_xz;
         let show_grid_xy = self.show_grid_xy;
         let show_grid_yz = self.show_grid_yz;

@@ -59,8 +59,7 @@ impl Scene {
         }
     }
 
-    /// TODO: change from Duration to sim_time
-    pub fn update(&mut self, sim_time: f32, queue: &wgpu::Queue) {
+    pub fn update(&mut self, sim_time: f64, queue: &wgpu::Queue) {
         // update celestial bodies (including their local transforms)
         for cb in &mut self.celestial_bodies {
             cb.update(sim_time);
