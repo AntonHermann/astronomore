@@ -4,6 +4,7 @@ mod gpu;
 mod grid;
 mod loader;
 mod mesh;
+mod pipelines;
 mod planets;
 mod scene;
 mod shader_loader;
@@ -28,28 +29,23 @@ use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::EventLoopExtWebSys;
 
-use crate::grid::{ColorVertex, DrawGrid, GridMesh};
-use crate::mesh::{DrawMesh, Vertex};
+use crate::grid::{DrawGrid, GridMesh};
+use crate::mesh::DrawMesh;
 use crate::{
     camera::{Camera, CameraRig},
     celestial_body::{CelestialBody, DrawCelestialBody, DrawCelestialBodyNormals},
     gpu::GpuContext,
+    pipelines::Pipelines,
 };
 
 pub struct State {
     gpu: GpuContext,
     last_update: web_time::Instant,
     last_frame_duration: web_time::Duration,
-    render_pipeline_layout: wgpu::PipelineLayout,
-    render_pipeline: wgpu::RenderPipeline,
-    wireframe_pipeline: wgpu::RenderPipeline,
-    grid_pipeline_layout: wgpu::PipelineLayout,
-    grid_pipeline: wgpu::RenderPipeline,
+    pipelines: Pipelines,
     grid_xz: GridMesh,
     grid_xy: GridMesh,
     grid_yz: GridMesh,
-    normals_pipeline_layout: wgpu::PipelineLayout,
-    normals_pipeline: wgpu::RenderPipeline,
     view: ui::ViewOptions,
     meshes: Vec<mesh::Mesh>,
     diffuse_texture: texture::Texture,
@@ -59,176 +55,6 @@ pub struct State {
     sim: sim::SimState,
     camera_rig: CameraRig,
     ui: ui::EguiLayer,
-}
-
-fn build_main_pipelines(
-    device: &wgpu::Device,
-    layout: &wgpu::PipelineLayout,
-    module: &wgpu::ShaderModule,
-    surface_format: wgpu::TextureFormat,
-) -> (wgpu::RenderPipeline, wgpu::RenderPipeline) {
-    let make = |polygon_mode: wgpu::PolygonMode, label: &str, fs_entry: &'static str| {
-        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some(label),
-            layout: Some(layout),
-            vertex: wgpu::VertexState {
-                module,
-                entry_point: Some("vs_main"),
-                buffers: &[Vertex::desc()],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module,
-                entry_point: Some(fs_entry),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                polygon_mode,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: texture::Texture::DEPTH_FORMAT,
-                depth_write_enabled: Some(true),
-                depth_compare: Some(wgpu::CompareFunction::Less),
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview_mask: None,
-            cache: None,
-        })
-    };
-
-    let fill = make(wgpu::PolygonMode::Fill, "Fill Pipeline", "fs_main");
-    #[cfg(not(target_arch = "wasm32"))]
-    let wire = make(
-        wgpu::PolygonMode::Line,
-        "Wireframe Pipeline",
-        "fs_wireframe",
-    );
-    #[cfg(target_arch = "wasm32")]
-    let wire = make(
-        wgpu::PolygonMode::Fill,
-        "Wireframe Pipeline",
-        "fs_wireframe",
-    );
-    (fill, wire)
-}
-
-fn build_normals_pipeline(
-    device: &wgpu::Device,
-    layout: &wgpu::PipelineLayout,
-    module: &wgpu::ShaderModule,
-    surface_format: wgpu::TextureFormat,
-) -> wgpu::RenderPipeline {
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Normals Pipeline"),
-        layout: Some(layout),
-        vertex: wgpu::VertexState {
-            module,
-            entry_point: Some("vs_main"),
-            buffers: &[ColorVertex::desc()],
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-        },
-        fragment: Some(wgpu::FragmentState {
-            module,
-            entry_point: Some("fs_main"),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: surface_format,
-                blend: Some(wgpu::BlendState::REPLACE),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-        }),
-        primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::LineList,
-            strip_index_format: None,
-            front_face: wgpu::FrontFace::Ccw,
-            cull_mode: None,
-            polygon_mode: wgpu::PolygonMode::Fill,
-            unclipped_depth: false,
-            conservative: false,
-        },
-        depth_stencil: Some(wgpu::DepthStencilState {
-            format: texture::Texture::DEPTH_FORMAT,
-            depth_write_enabled: Some(true),
-            depth_compare: Some(wgpu::CompareFunction::Less),
-            stencil: wgpu::StencilState::default(),
-            bias: wgpu::DepthBiasState::default(),
-        }),
-        multisample: wgpu::MultisampleState {
-            count: 1,
-            mask: !0,
-            alpha_to_coverage_enabled: false,
-        },
-        multiview_mask: None,
-        cache: None,
-    })
-}
-
-fn build_grid_pipeline(
-    device: &wgpu::Device,
-    layout: &wgpu::PipelineLayout,
-    module: &wgpu::ShaderModule,
-    surface_format: wgpu::TextureFormat,
-) -> wgpu::RenderPipeline {
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Grid Pipeline"),
-        layout: Some(layout),
-        vertex: wgpu::VertexState {
-            module,
-            entry_point: Some("vs_main"),
-            buffers: &[ColorVertex::desc()],
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-        },
-        fragment: Some(wgpu::FragmentState {
-            module,
-            entry_point: Some("fs_main"),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: surface_format,
-                blend: Some(wgpu::BlendState::REPLACE),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-        }),
-        primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::LineList,
-            strip_index_format: None,
-            front_face: wgpu::FrontFace::Ccw,
-            cull_mode: None,
-            polygon_mode: wgpu::PolygonMode::Fill,
-            unclipped_depth: false,
-            conservative: false,
-        },
-        depth_stencil: Some(wgpu::DepthStencilState {
-            format: texture::Texture::DEPTH_FORMAT,
-            depth_write_enabled: Some(true),
-            depth_compare: Some(wgpu::CompareFunction::Less),
-            stencil: wgpu::StencilState::default(),
-            bias: wgpu::DepthBiasState::default(),
-        }),
-        multisample: wgpu::MultisampleState {
-            count: 1,
-            mask: !0,
-            alpha_to_coverage_enabled: false,
-        },
-        multiview_mask: None,
-        cache: None,
-    })
 }
 
 impl State {
@@ -308,61 +134,19 @@ impl State {
         let initial_camera = Camera::new_orbit(sun_id, 30.0, 0f32.to_radians(), 30f32.to_radians());
         let camera_rig = CameraRig::new(device, size.width, size.height, initial_camera, &scene);
 
-        // ================= Render Pipeline =================
-
-        let shader_src = loader::load_str("src/shaders/shader.wgsl").await?;
-        shader_loader::validate_wgsl("shader.wgsl", &shader_src)?;
-        let shader = shader_loader::make_shader_module(device, "shader.wgsl", &shader_src);
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[
-                    Some(&texture_bind_group_layout),
-                    Some(&camera_rig.bind_group_layout),
-                    Some(&scene.model_bind_group_layout),
-                ],
-                immediate_size: 0,
-            });
-
-        let (render_pipeline, wireframe_pipeline) =
-            build_main_pipelines(device, &render_pipeline_layout, &shader, config.format);
-
-        // ================= Grid Pipeline =================
-        let grid_src = loader::load_str("src/shaders/grid.wgsl").await?;
-        shader_loader::validate_wgsl("grid.wgsl", &grid_src)?;
-        let grid_shader = shader_loader::make_shader_module(device, "grid.wgsl", &grid_src);
-        let grid_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Grid Pipeline Layout"),
-            bind_group_layouts: &[Some(&camera_rig.bind_group_layout)],
-            immediate_size: 0,
-        });
-        let grid_pipeline =
-            build_grid_pipeline(device, &grid_pipeline_layout, &grid_shader, config.format);
+        // ================= Pipelines =================
+        let pipelines = Pipelines::new(
+            device,
+            surface_format,
+            &texture_bind_group_layout,
+            &camera_rig.bind_group_layout,
+            &scene.model_bind_group_layout,
+        )
+        .await?;
 
         let grid_xz = GridMesh::xz_plane(device, 10);
         let grid_xy = GridMesh::xy_plane(device, 10);
         let grid_yz = GridMesh::yz_plane(device, 10);
-
-        // ================= Normals Pipeline =================
-        let normals_src = loader::load_str("src/shaders/normals.wgsl").await?;
-        shader_loader::validate_wgsl("normals.wgsl", &normals_src)?;
-        let normals_shader =
-            shader_loader::make_shader_module(device, "normals.wgsl", &normals_src);
-        let normals_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Normals Pipeline Layout"),
-                bind_group_layouts: &[
-                    Some(&camera_rig.bind_group_layout),
-                    Some(&scene.model_bind_group_layout),
-                ],
-                immediate_size: 0,
-            });
-        let normals_pipeline = build_normals_pipeline(
-            device,
-            &normals_pipeline_layout,
-            &normals_shader,
-            config.format,
-        );
 
         let identity_model_uniform = celestial_body::ModelUniform::default();
         let identity_model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -392,16 +176,10 @@ impl State {
             gpu,
             last_update: web_time::Instant::now(),
             last_frame_duration: web_time::Duration::ZERO,
-            render_pipeline_layout,
-            render_pipeline,
-            wireframe_pipeline,
-            grid_pipeline_layout,
-            grid_pipeline,
+            pipelines,
             grid_xz,
             grid_xy,
             grid_yz,
-            normals_pipeline_layout,
-            normals_pipeline,
             view: ui::ViewOptions::new(),
             meshes,
             identity_model_bind_group,
@@ -506,9 +284,9 @@ impl State {
             });
 
             let pipeline = if self.view.wireframe {
-                &self.wireframe_pipeline
+                &self.pipelines.wireframe
             } else {
-                &self.render_pipeline
+                &self.pipelines.fill
             };
             render_pass.set_pipeline(pipeline);
             render_pass.set_bind_group(0, &self.diffuse_texture.bind_group, &[]);
@@ -525,13 +303,13 @@ impl State {
             }
 
             if self.view.show_normals {
-                render_pass.set_pipeline(&self.normals_pipeline);
+                render_pass.set_pipeline(&self.pipelines.normals);
                 for planet in &self.scene.celestial_bodies {
                     render_pass.draw_body_normals(planet, &self.camera_rig.bind_group);
                 }
             }
 
-            render_pass.set_pipeline(&self.grid_pipeline);
+            render_pass.set_pipeline(&self.pipelines.grid);
             render_pass.set_bind_group(0, &self.camera_rig.bind_group, &[]);
             if self.view.show_grid_xz {
                 render_pass.draw_grid(&self.grid_xz);
@@ -883,92 +661,6 @@ impl State {
             self.camera_rig.controller.handle_key(code, state);
         }
     }
-
-    /// Reloads `shader.wgsl` from disk and recreates the main render pipelines.
-    ///
-    /// On validation error the miette diagnostic is printed to stderr and the
-    /// existing pipelines are left unchanged.
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn try_reload_main_shader(&mut self) {
-        let src = match std::fs::read_to_string("src/shaders/shader.wgsl") {
-            Ok(s) => s,
-            Err(e) => {
-                tracing::error!("shader.wgsl lesen fehlgeschlagen: {e}");
-                return;
-            }
-        };
-        match shader_loader::validate_wgsl("shader.wgsl", &src) {
-            Ok(()) => {
-                let module =
-                    shader_loader::make_shader_module(&self.gpu.device, "shader.wgsl", &src);
-                (self.render_pipeline, self.wireframe_pipeline) = build_main_pipelines(
-                    &self.gpu.device,
-                    &self.render_pipeline_layout,
-                    &module,
-                    self.gpu.config.format,
-                );
-                tracing::info!("shader.wgsl neu geladen");
-            }
-            Err(e) => tracing::error!(error = ?e, "shader.wgsl validation failed"),
-        }
-    }
-
-    /// Reloads `normals.wgsl` from disk and recreates the normals render pipeline.
-    ///
-    /// On validation error the miette diagnostic is printed to stderr and the
-    /// existing pipeline is left unchanged.
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn try_reload_normals_shader(&mut self) {
-        let src = match std::fs::read_to_string("src/shaders/normals.wgsl") {
-            Ok(s) => s,
-            Err(e) => {
-                tracing::error!("normals.wgsl lesen fehlgeschlagen: {e}");
-                return;
-            }
-        };
-        match shader_loader::validate_wgsl("normals.wgsl", &src) {
-            Ok(()) => {
-                let module =
-                    shader_loader::make_shader_module(&self.gpu.device, "normals.wgsl", &src);
-                self.normals_pipeline = build_normals_pipeline(
-                    &self.gpu.device,
-                    &self.normals_pipeline_layout,
-                    &module,
-                    self.gpu.config.format,
-                );
-                tracing::info!("normals.wgsl neu geladen");
-            }
-            Err(e) => eprintln!("{e:?}"),
-        }
-    }
-
-    /// Reloads `grid.wgsl` from disk and recreates the grid render pipeline.
-    ///
-    /// On validation error the miette diagnostic is printed to stderr and the
-    /// existing pipeline is left unchanged.
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn try_reload_grid_shader(&mut self) {
-        let src = match std::fs::read_to_string("src/shaders/grid.wgsl") {
-            Ok(s) => s,
-            Err(e) => {
-                tracing::error!("grid.wgsl lesen fehlgeschlagen: {e}");
-                return;
-            }
-        };
-        match shader_loader::validate_wgsl("grid.wgsl", &src) {
-            Ok(()) => {
-                let module = shader_loader::make_shader_module(&self.gpu.device, "grid.wgsl", &src);
-                self.grid_pipeline = build_grid_pipeline(
-                    &self.gpu.device,
-                    &self.grid_pipeline_layout,
-                    &module,
-                    self.gpu.config.format,
-                );
-                tracing::info!("grid.wgsl neu geladen");
-            }
-            Err(e) => tracing::error!(error = ?e, "grid.wgsl validation failed"),
-        }
-    }
 }
 
 pub struct App {
@@ -1199,13 +891,19 @@ impl ApplicationHandler<State> for App {
             }
         }
         if reload_main {
-            state.try_reload_main_shader();
+            state
+                .pipelines
+                .try_reload_main_shader(&state.gpu.device, state.gpu.config.format);
         }
         if reload_grid {
-            state.try_reload_grid_shader();
+            state
+                .pipelines
+                .try_reload_grid_shader(&state.gpu.device, state.gpu.config.format);
         }
         if reload_normals {
-            state.try_reload_normals_shader();
+            state
+                .pipelines
+                .try_reload_normals_shader(&state.gpu.device, state.gpu.config.format);
         }
         if reload_main || reload_grid || reload_normals {
             state.gpu.window.request_redraw();
