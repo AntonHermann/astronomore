@@ -14,6 +14,7 @@ pub struct Texture {
 
 impl Texture {
     /// Load texture from path. The path is also used as label.
+    #[tracing::instrument(err, skip(device, queue, bind_group_layout))]
     pub async fn load_from_path(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
