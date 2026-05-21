@@ -1,5 +1,6 @@
 mod camera;
 mod celestial_body;
+mod gpu;
 mod grid;
 mod loader;
 mod mesh;
@@ -32,15 +33,11 @@ use crate::mesh::{DrawMesh, Vertex};
 use crate::{
     camera::{Camera, CameraRig},
     celestial_body::{CelestialBody, DrawCelestialBody, DrawCelestialBodyNormals},
+    gpu::GpuContext,
 };
 
 pub struct State {
-    surface: wgpu::Surface<'static>,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
-    is_surface_configured: bool,
-    window: Arc<Window>,
+    gpu: GpuContext,
     last_update: web_time::Instant,
     last_frame_duration: web_time::Duration,
     render_pipeline_layout: wgpu::PipelineLayout,
@@ -61,7 +58,6 @@ pub struct State {
     scene: scene::Scene,
     sim: sim::SimState,
     camera_rig: CameraRig,
-    depth_texture: texture::Texture,
     ui: ui::EguiLayer,
 }
 
@@ -237,87 +233,12 @@ fn build_grid_pipeline(
 
 impl State {
     pub async fn new(window: Arc<Window>) -> miette::Result<Self> {
-        let size = window.inner_size();
-
-        // The instance is a handle to our GPU
-        // BackendBit::PRIMARY => Vulkan + Metal + DX12 + Browser WebGPU
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            #[cfg(not(target_arch = "wasm32"))]
-            backends: wgpu::Backends::PRIMARY,
-            #[cfg(target_arch = "wasm32")]
-            backends: wgpu::Backends::GL,
-            flags: Default::default(),
-            memory_budget_thresholds: Default::default(),
-            backend_options: Default::default(),
-            display: None,
-        });
-
-        // part of the window that we draw to
-        let surface = instance.create_surface(window.clone()).into_diagnostic()?;
-
-        // handle to the actual graphics card, locked to specific backend
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::default(),
-                compatible_surface: Some(&surface),
-                force_fallback_adapter: false,
-            })
-            .await
-            .into_diagnostic()?;
-
-        let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor {
-                label: None,
-                required_features: if cfg!(target_arch = "wasm32") {
-                    wgpu::Features::empty()
-                } else {
-                    wgpu::Features::POLYGON_MODE_LINE
-                },
-                experimental_features: wgpu::ExperimentalFeatures::disabled(),
-                // WebGL doesn't support all of wgpu's features, so if
-                // we're building for the web we'll have to disable some.
-                required_limits: if cfg!(target_arch = "wasm32") {
-                    wgpu::Limits::downlevel_webgl2_defaults()
-                } else {
-                    wgpu::Limits::default()
-                },
-                memory_hints: Default::default(),
-                trace: wgpu::Trace::Off,
-            })
-            .await
-            .into_diagnostic()?;
-
-        let adapter_info = adapter.get_info();
-        tracing::info!(
-            adapter = %adapter_info.name,
-            device_type = ?adapter_info.device_type,
-            "Using adapter"
-        );
-        tracing::info!(backend = ?adapter_info.backend, "GPU backend selected");
-        tracing::trace!("Adapter features: {:#?}", adapter.features());
-        tracing::debug!("Device features: {:#?}", device.features());
-        tracing::trace!("Device limits: {:#?}", device.limits());
-
-        let surface_caps = surface.get_capabilities(&adapter);
-        // Shader code in this tutorial assumes an sRGB surface texture. Using a different
-        // one will result in all the colors coming out darker. If you want to support non
-        // sRGB surfaces, you'll need to account for that when drawing to the frame.
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .find(|f| f.is_srgb())
-            .copied()
-            .unwrap_or(surface_caps.formats[0]);
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: size.width,
-            height: size.height,
-            present_mode: surface_caps.present_modes[0],
-            alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
-        };
+        let gpu = GpuContext::new(window).await?;
+        let device = &gpu.device;
+        let queue = &gpu.queue;
+        let config = &gpu.config;
+        let surface_format = config.format;
+        let size = winit::dpi::PhysicalSize::new(config.width, config.height);
 
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -345,25 +266,21 @@ impl State {
             });
         let diffuse_bytes = loader::load_bytes("assets/textures/dbg.png").await?;
         let diffuse_texture = texture::Texture::from_bytes(
-            &device,
-            &queue,
+            device,
+            queue,
             &diffuse_bytes,
             "dbg.png",
             &texture_bind_group_layout,
         )?;
 
-        // ================= Depth Texture setup =================
-        let depth_texture =
-            texture::Texture::create_depth_texture(&device, &config, "depth_texture");
-
         // ==================== Scene setup =====================
-        let mut scene = scene::Scene::new(&device);
+        let mut scene = scene::Scene::new(device);
         let mut body_ids: Vec<scene::BodyId> = Vec::with_capacity(planets::BODIES.len());
         for def in planets::BODIES {
             let bytes = loader::load_bytes(def.texture_path).await?;
             let texture = texture::Texture::from_bytes(
-                &device,
-                &queue,
+                device,
+                queue,
                 &bytes,
                 def.name,
                 &texture_bind_group_layout,
@@ -371,7 +288,7 @@ impl State {
             let parent_id = def.parent.map(|p| body_ids[p as usize]);
             let id = scene.add_celestial_body(
                 CelestialBody::new(
-                    &device,
+                    device,
                     def.name,
                     def.distance_from_parent,
                     def.radius,
@@ -388,15 +305,14 @@ impl State {
         // ======= Camera setup =======
         // let initial_camera =
         //     Camera::new_fps((0.0, 8.0, 25.0), -90f32.to_radians(), -15f32.to_radians());
-        let initial_camera =
-            Camera::new_orbit(sun_id, 30.0, 0f32.to_radians(), 30f32.to_radians());
-        let camera_rig = CameraRig::new(&device, size.width, size.height, initial_camera, &scene);
+        let initial_camera = Camera::new_orbit(sun_id, 30.0, 0f32.to_radians(), 30f32.to_radians());
+        let camera_rig = CameraRig::new(device, size.width, size.height, initial_camera, &scene);
 
         // ================= Render Pipeline =================
 
         let shader_src = loader::load_str("src/shaders/shader.wgsl").await?;
         shader_loader::validate_wgsl("shader.wgsl", &shader_src)?;
-        let shader = shader_loader::make_shader_module(&device, "shader.wgsl", &shader_src);
+        let shader = shader_loader::make_shader_module(device, "shader.wgsl", &shader_src);
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
@@ -409,29 +325,29 @@ impl State {
             });
 
         let (render_pipeline, wireframe_pipeline) =
-            build_main_pipelines(&device, &render_pipeline_layout, &shader, config.format);
+            build_main_pipelines(device, &render_pipeline_layout, &shader, config.format);
 
         // ================= Grid Pipeline =================
         let grid_src = loader::load_str("src/shaders/grid.wgsl").await?;
         shader_loader::validate_wgsl("grid.wgsl", &grid_src)?;
-        let grid_shader = shader_loader::make_shader_module(&device, "grid.wgsl", &grid_src);
+        let grid_shader = shader_loader::make_shader_module(device, "grid.wgsl", &grid_src);
         let grid_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Grid Pipeline Layout"),
             bind_group_layouts: &[Some(&camera_rig.bind_group_layout)],
             immediate_size: 0,
         });
         let grid_pipeline =
-            build_grid_pipeline(&device, &grid_pipeline_layout, &grid_shader, config.format);
+            build_grid_pipeline(device, &grid_pipeline_layout, &grid_shader, config.format);
 
-        let grid_xz = GridMesh::xz_plane(&device, 10);
-        let grid_xy = GridMesh::xy_plane(&device, 10);
-        let grid_yz = GridMesh::yz_plane(&device, 10);
+        let grid_xz = GridMesh::xz_plane(device, 10);
+        let grid_xy = GridMesh::xy_plane(device, 10);
+        let grid_yz = GridMesh::yz_plane(device, 10);
 
         // ================= Normals Pipeline =================
         let normals_src = loader::load_str("src/shaders/normals.wgsl").await?;
         shader_loader::validate_wgsl("normals.wgsl", &normals_src)?;
         let normals_shader =
-            shader_loader::make_shader_module(&device, "normals.wgsl", &normals_src);
+            shader_loader::make_shader_module(device, "normals.wgsl", &normals_src);
         let normals_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Normals Pipeline Layout"),
@@ -442,7 +358,7 @@ impl State {
                 immediate_size: 0,
             });
         let normals_pipeline = build_normals_pipeline(
-            &device,
+            device,
             &normals_pipeline_layout,
             &normals_shader,
             config.format,
@@ -470,15 +386,10 @@ impl State {
         ];
 
         // ==================== egui setup ====================
-        let ui_layer = ui::EguiLayer::new(&device, &window, surface_format);
+        let ui_layer = ui::EguiLayer::new(device, &gpu.window, surface_format);
 
         Ok(Self {
-            surface,
-            device,
-            queue,
-            config,
-            is_surface_configured: false,
-            window,
+            gpu,
             last_update: web_time::Instant::now(),
             last_frame_duration: web_time::Duration::ZERO,
             render_pipeline_layout,
@@ -498,21 +409,13 @@ impl State {
             scene,
             sim: sim::SimState::new(),
             camera_rig,
-            depth_texture,
             ui: ui_layer,
         })
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        if width > 0 && height > 0 {
-            self.config.width = width;
-            self.config.height = height;
-            self.surface.configure(&self.device, &self.config);
-            self.depth_texture =
-                texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
-            self.camera_rig.resize(width, height);
-            self.is_surface_configured = true;
-        }
+        self.gpu.resize(width, height);
+        self.camera_rig.resize(width, height);
     }
 
     /// Update application state before rendering
@@ -523,21 +426,23 @@ impl State {
         self.last_update = now;
 
         self.sim.advance(dt);
-        self.scene.update(self.sim.time, &self.queue);
-        self.camera_rig.update(dt, &self.scene, &self.queue);
+        self.scene.update(self.sim.time, &self.gpu.queue);
+        self.camera_rig.update(dt, &self.scene, &self.gpu.queue);
     }
 
     pub fn render(&mut self) -> miette::Result<()> {
-        self.window.request_redraw();
+        self.gpu.window.request_redraw();
 
-        if !self.is_surface_configured {
+        if !self.gpu.is_surface_configured {
             return Ok(());
         }
 
-        let output = match self.surface.get_current_texture() {
+        let output = match self.gpu.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(surface_texture) => surface_texture,
             wgpu::CurrentSurfaceTexture::Suboptimal(surface_texture) => {
-                self.surface.configure(&self.device, &self.config);
+                self.gpu
+                    .surface
+                    .configure(&self.gpu.device, &self.gpu.config);
                 surface_texture
             }
             wgpu::CurrentSurfaceTexture::Timeout
@@ -547,7 +452,9 @@ impl State {
                 return Ok(());
             }
             wgpu::CurrentSurfaceTexture::Outdated => {
-                self.surface.configure(&self.device, &self.config);
+                self.gpu
+                    .surface
+                    .configure(&self.gpu.device, &self.gpu.config);
                 return Ok(());
             }
             wgpu::CurrentSurfaceTexture::Lost => {
@@ -562,6 +469,7 @@ impl State {
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         let mut encoder = self
+            .gpu
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
@@ -585,7 +493,7 @@ impl State {
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_texture.view,
+                    view: &self.gpu.depth_texture.view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: wgpu::StoreOp::Store,
@@ -686,7 +594,7 @@ impl State {
             }
         }
 
-        let raw_input = self.ui.state.take_egui_input(&self.window);
+        let raw_input = self.ui.state.take_egui_input(&self.gpu.window);
         self.ui.ctx.begin_pass(raw_input);
         egui::Window::new("Simulation")
             .resizable(false)
@@ -893,24 +801,24 @@ impl State {
 
         self.ui
             .state
-            .handle_platform_output(&self.window, full_output.platform_output);
+            .handle_platform_output(&self.gpu.window, full_output.platform_output);
         let clipped_primitives = self
             .ui
             .ctx
             .tessellate(full_output.shapes, full_output.pixels_per_point);
         let screen_descriptor = egui_wgpu::ScreenDescriptor {
-            size_in_pixels: [self.config.width, self.config.height],
+            size_in_pixels: [self.gpu.config.width, self.gpu.config.height],
             pixels_per_point: full_output.pixels_per_point,
         };
 
         for (id, image_delta) in &full_output.textures_delta.set {
             self.ui
                 .renderer
-                .update_texture(&self.device, &self.queue, *id, image_delta);
+                .update_texture(&self.gpu.device, &self.gpu.queue, *id, image_delta);
         }
         self.ui.renderer.update_buffers(
-            &self.device,
-            &self.queue,
+            &self.gpu.device,
+            &self.gpu.queue,
             &mut encoder,
             &clipped_primitives,
             &screen_descriptor,
@@ -945,7 +853,7 @@ impl State {
         }
 
         // submit will accept anything that implements IntoIter
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.gpu.queue.submit(std::iter::once(encoder.finish()));
         output.present();
 
         Ok(())
@@ -991,12 +899,13 @@ impl State {
         };
         match shader_loader::validate_wgsl("shader.wgsl", &src) {
             Ok(()) => {
-                let module = shader_loader::make_shader_module(&self.device, "shader.wgsl", &src);
+                let module =
+                    shader_loader::make_shader_module(&self.gpu.device, "shader.wgsl", &src);
                 (self.render_pipeline, self.wireframe_pipeline) = build_main_pipelines(
-                    &self.device,
+                    &self.gpu.device,
                     &self.render_pipeline_layout,
                     &module,
-                    self.config.format,
+                    self.gpu.config.format,
                 );
                 tracing::info!("shader.wgsl neu geladen");
             }
@@ -1019,12 +928,13 @@ impl State {
         };
         match shader_loader::validate_wgsl("normals.wgsl", &src) {
             Ok(()) => {
-                let module = shader_loader::make_shader_module(&self.device, "normals.wgsl", &src);
+                let module =
+                    shader_loader::make_shader_module(&self.gpu.device, "normals.wgsl", &src);
                 self.normals_pipeline = build_normals_pipeline(
-                    &self.device,
+                    &self.gpu.device,
                     &self.normals_pipeline_layout,
                     &module,
-                    self.config.format,
+                    self.gpu.config.format,
                 );
                 tracing::info!("normals.wgsl neu geladen");
             }
@@ -1047,12 +957,12 @@ impl State {
         };
         match shader_loader::validate_wgsl("grid.wgsl", &src) {
             Ok(()) => {
-                let module = shader_loader::make_shader_module(&self.device, "grid.wgsl", &src);
+                let module = shader_loader::make_shader_module(&self.gpu.device, "grid.wgsl", &src);
                 self.grid_pipeline = build_grid_pipeline(
-                    &self.device,
+                    &self.gpu.device,
                     &self.grid_pipeline_layout,
                     &module,
-                    self.config.format,
+                    self.gpu.config.format,
                 );
                 tracing::info!("grid.wgsl neu geladen");
             }
@@ -1192,10 +1102,10 @@ impl ApplicationHandler<State> for App {
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut event: State) {
         #[cfg(target_arch = "wasm32")]
         {
-            event.window.request_redraw();
+            event.gpu.window.request_redraw();
             event.resize(
-                event.window.inner_size().width,
-                event.window.inner_size().height,
+                event.gpu.window.inner_size().width,
+                event.gpu.window.inner_size().height,
             );
         }
         self.state = Some(event);
@@ -1230,7 +1140,7 @@ impl ApplicationHandler<State> for App {
         let egui_consumed = state
             .ui
             .state
-            .on_window_event(&state.window, &event)
+            .on_window_event(&state.gpu.window, &event)
             .consumed;
 
         match event {
@@ -1243,8 +1153,8 @@ impl ApplicationHandler<State> for App {
                     Err(e) => {
                         tracing::error!(
                             error = ?e,
-                            width = state.config.width,
-                            height = state.config.height,
+                            width = state.gpu.config.width,
+                            height = state.gpu.config.height,
                             "Render failed; exiting"
                         );
                         event_loop.exit();
@@ -1298,7 +1208,7 @@ impl ApplicationHandler<State> for App {
             state.try_reload_normals_shader();
         }
         if reload_main || reload_grid || reload_normals {
-            state.window.request_redraw();
+            state.gpu.window.request_redraw();
         }
     }
 }
