@@ -46,6 +46,16 @@ use crate::{
     pipelines::Pipelines,
 };
 
+fn resolve_orbit_target(camera: &Camera, scene: &scene::Scene) -> Option<glam::Vec3> {
+    match camera {
+        Camera::Orbit(c) => Some(
+            scene
+                .get_body_orbital_transform(c.target)
+                .transform_point3(glam::Vec3::ZERO),
+        ),
+        _ => None,
+    }
+}
 pub struct State {
     gpu: GpuContext,
     last_update: web_time::Instant,
@@ -361,7 +371,13 @@ impl State {
         let mut reset_camera = false;
         let cam_pos = match &self.camera_rig.camera {
             Camera::Fps(camera) => camera.position,
-            Camera::Orbit(camera) => camera.target_and_camera_pos(&self.scene).1,
+            Camera::Orbit(camera) => {
+                let target_pos = self
+                    .scene
+                    .get_body_orbital_transform(camera.target)
+                    .transform_point3(glam::Vec3::ZERO);
+                camera.position(target_pos)
+            }
         };
         let cam_is_fps = matches!(&self.camera_rig.camera, Camera::Fps(_));
         let body_list: Vec<(scene::BodyId, String)> = self
@@ -715,7 +731,13 @@ impl State {
             let screen_w = self.gpu.config.width as f32;
             let screen_h = self.gpu.config.height as f32;
             let view_proj = self.camera_rig.projection.cam_to_clip_matrix()
-                * self.camera_rig.camera.world_to_cam_matrix(&self.scene);
+                * self
+                    .camera_rig
+                    .camera
+                    .world_to_cam_matrix(resolve_orbit_target(
+                        &self.camera_rig.camera,
+                        &self.scene,
+                    ));
 
             for (body_id, name) in &body_list {
                 let world_pos = self
