@@ -47,7 +47,7 @@ pub struct GridMesh {
 
 impl GridMesh {
     /// Uploads `vertices` to a new GPU vertex buffer and returns a [`GridMesh`].
-    fn build(device: &wgpu::Device, name: &str, vertices: Vec<ColorVertex>) -> Self {
+    pub fn build(device: &wgpu::Device, name: &str, vertices: Vec<ColorVertex>) -> Self {
         let num_vertices = vertices.len() as u32;
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(name),

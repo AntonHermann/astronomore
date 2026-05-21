@@ -1,6 +1,10 @@
 use wgpu::util::DeviceExt;
 
+use crate::grid::{ColorVertex, GridMesh};
 use crate::{mesh, texture};
+
+const NORMAL_SCALE: f32 = 0.15;
+const NORMAL_COLOR: [f32; 4] = [0.2, 1.0, 0.4, 1.0];
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -39,6 +43,7 @@ pub struct CelestialBody {
     pub name: String,
     texture: texture::Texture,
     mesh: mesh::Mesh,
+    pub normals_mesh: GridMesh,
     pub radius: f32,
     pub orbital_parameters: OrbitalParameters,
     pub orbital_transform: glam::Mat4,
@@ -58,6 +63,29 @@ impl CelestialBody {
         model_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let mesh = mesh::Mesh::sphere(device, 128, 64);
+
+        let normals_vertices: Vec<ColorVertex> = mesh
+            .vertices
+            .iter()
+            .flat_map(|v| {
+                let end = [
+                    v.position[0] + v.normal[0] * NORMAL_SCALE,
+                    v.position[1] + v.normal[1] * NORMAL_SCALE,
+                    v.position[2] + v.normal[2] * NORMAL_SCALE,
+                ];
+                [
+                    ColorVertex {
+                        position: v.position,
+                        color: NORMAL_COLOR,
+                    },
+                    ColorVertex {
+                        position: end,
+                        color: NORMAL_COLOR,
+                    },
+                ]
+            })
+            .collect();
+        let normals_mesh = GridMesh::build(device, &format!("{name} Normals"), normals_vertices);
 
         let orbital_parameters = OrbitalParameters {
             parent_id: None,
@@ -86,6 +114,7 @@ impl CelestialBody {
             name: name.into(),
             texture,
             mesh,
+            normals_mesh,
             radius,
             orbital_parameters,
             orbital_transform: glam::Mat4::IDENTITY,
@@ -141,5 +170,17 @@ impl<'a, 'b: 'a> DrawCelestialBody<'b> for wgpu::RenderPass<'a> {
         self.set_bind_group(1, camera_bind_group, &[]);
         self.set_bind_group(2, &cb.model_bind_group, &[]);
         self.draw_indexed(0..cb.mesh.num_elements, 0, instances);
+    }
+}
+
+pub trait DrawCelestialBodyNormals<'a> {
+    fn draw_body_normals(&mut self, cb: &'a CelestialBody, camera_bind_group: &wgpu::BindGroup);
+}
+impl<'a, 'b: 'a> DrawCelestialBodyNormals<'b> for wgpu::RenderPass<'a> {
+    fn draw_body_normals(&mut self, cb: &'b CelestialBody, camera_bind_group: &wgpu::BindGroup) {
+        self.set_vertex_buffer(0, cb.normals_mesh.vertex_buffer.slice(..));
+        self.set_bind_group(0, camera_bind_group, &[]);
+        self.set_bind_group(1, &cb.model_bind_group, &[]);
+        self.draw(0..cb.normals_mesh.num_vertices, 0..1);
     }
 }

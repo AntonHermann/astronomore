@@ -3,9 +3,9 @@ use wgpu::util::DeviceExt;
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
-    position: [f32; 3],
-    tex_coords: [f32; 2],
-    normal: [f32; 3],
+    pub position: [f32; 3],
+    pub tex_coords: [f32; 2],
+    pub normal: [f32; 3],
 }
 
 impl Vertex {
@@ -56,6 +56,7 @@ impl std::fmt::Display for Vertex {
 pub struct Mesh {
     #[allow(dead_code)]
     name: String,
+    pub vertices: Vec<Vertex>,
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_elements: u32,
@@ -79,6 +80,7 @@ impl Mesh {
 
         Self {
             name: name.into(),
+            vertices: vertices.to_vec(),
             vertex_buffer,
             index_buffer,
             num_elements,

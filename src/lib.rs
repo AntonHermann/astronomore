@@ -29,7 +29,7 @@ use crate::grid::{ColorVertex, DrawGrid, GridMesh};
 use crate::mesh::{DrawMesh, Vertex};
 use crate::{
     camera::{Camera, CameraController, Projection},
-    celestial_body::{CelestialBody, DrawCelestialBody},
+    celestial_body::{CelestialBody, DrawCelestialBody, DrawCelestialBodyNormals},
 };
 
 #[repr(C)]
@@ -70,6 +70,9 @@ pub struct State {
     show_grid_xz: bool,
     show_grid_xy: bool,
     show_grid_yz: bool,
+    normals_pipeline_layout: wgpu::PipelineLayout,
+    normals_pipeline: wgpu::RenderPipeline,
+    show_normals: bool,
     meshes: Vec<mesh::Mesh>,
     diffuse_texture: texture::Texture,
     // diffuse_bind_group: wgpu::BindGroup,
@@ -157,6 +160,57 @@ fn build_main_pipelines(
         "fs_wireframe",
     );
     (fill, wire)
+}
+
+fn build_normals_pipeline(
+    device: &wgpu::Device,
+    layout: &wgpu::PipelineLayout,
+    module: &wgpu::ShaderModule,
+    surface_format: wgpu::TextureFormat,
+) -> wgpu::RenderPipeline {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("Normals Pipeline"),
+        layout: Some(layout),
+        vertex: wgpu::VertexState {
+            module,
+            entry_point: Some("vs_main"),
+            buffers: &[ColorVertex::desc()],
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module,
+            entry_point: Some("fs_main"),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: surface_format,
+                blend: Some(wgpu::BlendState::REPLACE),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+        }),
+        primitive: wgpu::PrimitiveState {
+            topology: wgpu::PrimitiveTopology::LineList,
+            strip_index_format: None,
+            front_face: wgpu::FrontFace::Ccw,
+            cull_mode: None,
+            polygon_mode: wgpu::PolygonMode::Fill,
+            unclipped_depth: false,
+            conservative: false,
+        },
+        depth_stencil: Some(wgpu::DepthStencilState {
+            format: texture::Texture::DEPTH_FORMAT,
+            depth_write_enabled: Some(true),
+            depth_compare: Some(wgpu::CompareFunction::Less),
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
+        }),
+        multisample: wgpu::MultisampleState {
+            count: 1,
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        },
+        multiview_mask: None,
+        cache: None,
+    })
 }
 
 fn build_grid_pipeline(
@@ -439,6 +493,27 @@ impl State {
         let grid_xy = GridMesh::xy_plane(&device, 10);
         let grid_yz = GridMesh::yz_plane(&device, 10);
 
+        // ================= Normals Pipeline =================
+        let normals_src = loader::load_str("src/shaders/normals.wgsl").await?;
+        shader_loader::validate_wgsl("normals.wgsl", &normals_src)?;
+        let normals_shader =
+            shader_loader::make_shader_module(&device, "normals.wgsl", &normals_src);
+        let normals_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Normals Pipeline Layout"),
+                bind_group_layouts: &[
+                    Some(&camera_bind_group_layout),
+                    Some(&scene.model_bind_group_layout),
+                ],
+                immediate_size: 0,
+            });
+        let normals_pipeline = build_normals_pipeline(
+            &device,
+            &normals_pipeline_layout,
+            &normals_shader,
+            config.format,
+        );
+
         let identity_model_uniform = celestial_body::ModelUniform::default();
         let identity_model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Identity Model Buffer"),
@@ -497,6 +572,9 @@ impl State {
             show_grid_xz: true,
             show_grid_xy: false,
             show_grid_yz: false,
+            normals_pipeline_layout,
+            normals_pipeline,
+            show_normals: false,
             meshes,
             identity_model_bind_group,
             diffuse_texture,
@@ -655,6 +733,13 @@ impl State {
                 render_pass.draw_celestial_body(planet, &self.camera_bind_group);
             }
 
+            if self.show_normals {
+                render_pass.set_pipeline(&self.normals_pipeline);
+                for planet in &self.scene.celestial_bodies {
+                    render_pass.draw_body_normals(planet, &self.camera_bind_group);
+                }
+            }
+
             render_pass.set_pipeline(&self.grid_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             if self.show_grid_xz {
@@ -677,8 +762,10 @@ impl State {
         let sim_time_multiplier = self.sim_time_multiplier;
         let is_paused = self.is_paused;
         let wireframe = self.wireframe;
+        let show_normals = self.show_normals;
         let mut toggle_pause = false;
         let mut toggle_wireframe = false;
+        let mut toggle_normals = false;
         let mut new_multiplier: Option<f64> = None;
         let show_grid_xz = self.show_grid_xz;
         let show_grid_xy = self.show_grid_xy;
@@ -768,6 +855,18 @@ impl State {
                     .clicked()
                 {
                     toggle_wireframe = true;
+                }
+                let normals_label = if show_normals {
+                    "Normalen: an"
+                } else {
+                    "Normalen: aus"
+                };
+                if ui
+                    .button(normals_label)
+                    .on_hover_text("Umschalten (N)")
+                    .clicked()
+                {
+                    toggle_normals = true;
                 }
                 ui.separator();
                 egui::CollapsingHeader::new("Gitternetz")
@@ -878,6 +977,9 @@ impl State {
         if toggle_wireframe {
             self.wireframe = !self.wireframe;
         }
+        if toggle_normals {
+            self.show_normals = !self.show_normals;
+        }
         if let Some(v) = new_grid_xz {
             self.show_grid_xz = v;
         }
@@ -975,6 +1077,9 @@ impl State {
         } else if code == KeyCode::Tab && state.is_pressed() {
             self.wireframe = !self.wireframe;
             tracing::info!("Wireframe mode: {}", self.wireframe);
+        } else if code == KeyCode::KeyN && state.is_pressed() {
+            self.show_normals = !self.show_normals;
+            tracing::info!("Normalen-Visualisierung: {}", self.show_normals);
         } else if code == KeyCode::PageUp && state.is_pressed() {
             self.sim_time_multiplier *= 2.0;
             tracing::info!("Sim time mult: {}x", self.sim_time_multiplier);
@@ -1021,6 +1126,34 @@ impl State {
                     self.config.format,
                 );
                 tracing::info!("shader.wgsl neu geladen");
+            }
+            Err(e) => eprintln!("{e:?}"),
+        }
+    }
+
+    /// Reloads `normals.wgsl` from disk and recreates the normals render pipeline.
+    ///
+    /// On validation error the miette diagnostic is printed to stderr and the
+    /// existing pipeline is left unchanged.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn try_reload_normals_shader(&mut self) {
+        let src = match std::fs::read_to_string("src/shaders/normals.wgsl") {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("normals.wgsl lesen fehlgeschlagen: {e}");
+                return;
+            }
+        };
+        match shader_loader::validate_wgsl("normals.wgsl", &src) {
+            Ok(()) => {
+                let module = shader_loader::make_shader_module(&self.device, "normals.wgsl", &src);
+                self.normals_pipeline = build_normals_pipeline(
+                    &self.device,
+                    &self.normals_pipeline_layout,
+                    &module,
+                    self.config.format,
+                );
+                tracing::info!("normals.wgsl neu geladen");
             }
             Err(e) => eprintln!("{e:?}"),
         }
@@ -1242,10 +1375,12 @@ impl ApplicationHandler<State> for App {
 
         let mut reload_main = false;
         let mut reload_grid = false;
+        let mut reload_normals = false;
         while let Ok(path) = rx.try_recv() {
             match path.file_name().and_then(|n| n.to_str()) {
                 Some("shader.wgsl") => reload_main = true,
                 Some("grid.wgsl") => reload_grid = true,
+                Some("normals.wgsl") => reload_normals = true,
                 _ => {}
             }
         }
@@ -1255,7 +1390,10 @@ impl ApplicationHandler<State> for App {
         if reload_grid {
             state.try_reload_grid_shader();
         }
-        if reload_main || reload_grid {
+        if reload_normals {
+            state.try_reload_normals_shader();
+        }
+        if reload_main || reload_grid || reload_normals {
             state.window.request_redraw();
         }
     }
