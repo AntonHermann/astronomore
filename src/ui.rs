@@ -30,11 +30,13 @@ impl ViewOptions {
     /// Flip the wireframe flag.
     pub fn toggle_wireframe(&mut self) {
         self.wireframe = !self.wireframe;
+        tracing::info!("Wireframe mode: {}", self.wireframe);
     }
 
     /// Flip the normals-overlay flag.
     pub fn toggle_normals(&mut self) {
         self.show_normals = !self.show_normals;
+        tracing::info!("Normals visualization: {}", self.show_normals);
     }
 
     /// True if at least one grid plane is currently visible.
@@ -48,6 +50,7 @@ impl ViewOptions {
         self.show_grid_xz = target;
         self.show_grid_xy = target;
         self.show_grid_yz = target;
+        tracing::info!("Grids: {}", self.any_grid_visible());
     }
 }
 

@@ -642,10 +642,8 @@ impl State {
             event_loop.exit();
         } else if code == KeyCode::Tab && state.is_pressed() {
             self.view.toggle_wireframe();
-            tracing::info!("Wireframe mode: {}", self.view.wireframe);
         } else if code == KeyCode::KeyN && state.is_pressed() {
             self.view.toggle_normals();
-            tracing::info!("Normalen-Visualisierung: {}", self.view.show_normals);
         } else if code == KeyCode::PageUp && state.is_pressed() {
             self.sim.double_speed();
         } else if code == KeyCode::PageDown && state.is_pressed() {
@@ -656,7 +654,6 @@ impl State {
             self.sim.toggle_pause();
         } else if code == KeyCode::KeyG && state.is_pressed() {
             self.view.toggle_all_grids();
-            tracing::info!("Grids: {}", self.view.any_grid_visible());
         } else {
             self.camera_rig.controller.handle_key(code, state);
         }

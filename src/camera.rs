@@ -413,5 +413,4 @@ impl CameraRig {
             .update_view_proj(&self.camera, &self.projection, scene);
         queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&[self.uniform]));
     }
-
 }
