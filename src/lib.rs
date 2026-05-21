@@ -318,11 +318,11 @@ impl State {
 
         let adapter_info = adapter.get_info();
         tracing::info!(
-            "Using adapter: {} ({:?})",
-            adapter_info.name,
-            adapter_info.device_type
+            adapter = %adapter_info.name,
+            device_type = ?adapter_info.device_type,
+            "Using adapter"
         );
-        tracing::info!("Backend: {}", adapter_info.backend);
+        tracing::info!(backend = ?adapter_info.backend, "GPU backend selected");
         tracing::trace!("Adapter features: {:#?}", adapter.features());
         tracing::debug!("Device features: {:#?}", device.features());
         tracing::trace!("Device limits: {:#?}", device.limits());
@@ -1162,7 +1162,7 @@ impl State {
                 );
                 tracing::info!("shader.wgsl neu geladen");
             }
-            Err(e) => eprintln!("{e:?}"),
+            Err(e) => tracing::error!(error = ?e, "shader.wgsl validation failed"),
         }
     }
 
@@ -1218,7 +1218,7 @@ impl State {
                 );
                 tracing::info!("grid.wgsl neu geladen");
             }
-            Err(e) => eprintln!("{e:?}"),
+            Err(e) => tracing::error!(error = ?e, "grid.wgsl validation failed"),
         }
     }
 }
@@ -1276,50 +1276,75 @@ impl ApplicationHandler<State> for App {
             window_attributes = window_attributes.with_canvas(Some(html_canvas_element));
         }
 
-        let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+        let window = match event_loop.create_window(window_attributes) {
+            Ok(w) => Arc::new(w),
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to create window");
+                event_loop.exit();
+                return;
+            }
+        };
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            self.state = Some(pollster::block_on(State::new(window)).unwrap());
+            let state = match pollster::block_on(State::new(window)) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to initialize GPU state");
+                    event_loop.exit();
+                    return;
+                }
+            };
+            self.state = Some(state);
 
             let (tx, rx) = std::sync::mpsc::channel();
-            let mut debouncer = notify_debouncer_mini::new_debouncer(
+            match notify_debouncer_mini::new_debouncer(
                 std::time::Duration::from_millis(150),
                 move |res: notify_debouncer_mini::DebounceEventResult| {
                     if let Ok(events) = res {
                         for event in events {
                             if event.kind == notify_debouncer_mini::DebouncedEventKind::Any {
+                                // channel closed when shader_rx is dropped — ignore
                                 let _ = tx.send(event.path);
                             }
                         }
                     }
                 },
-            )
-            .expect("Shader-Watcher konnte nicht gestartet werden");
-            debouncer
-                .watcher()
-                .watch(
-                    std::path::Path::new("src/shaders"),
-                    notify_debouncer_mini::notify::RecursiveMode::NonRecursive,
-                )
-                .expect("src/shaders kann nicht beobachtet werden");
-            self._debouncer = Some(debouncer);
-            self.shader_rx = Some(rx);
+            ) {
+                Ok(mut debouncer) => {
+                    match debouncer.watcher().watch(
+                        std::path::Path::new("src/shaders"),
+                        notify_debouncer_mini::notify::RecursiveMode::NonRecursive,
+                    ) {
+                        Ok(()) => {
+                            self._debouncer = Some(debouncer);
+                            self.shader_rx = Some(rx);
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, "Cannot watch src/shaders - hot-reload disabled");
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Cannot start shader watcher - hot-reload disabled");
+                }
+            }
         }
 
         #[cfg(target_arch = "wasm32")]
         {
             if let Some(proxy) = self.proxy.take() {
                 wasm_bindgen_futures::spawn_local(async move {
-                    assert!(
-                        proxy
-                            .send_event(
-                                State::new(window)
-                                    .await
-                                    .expect("Unable to create canvas!!!")
-                            )
-                            .is_ok()
-                    )
+                    match State::new(window).await {
+                        Ok(state) => {
+                            if proxy.send_event(state).is_err() {
+                                tracing::error!("Failed to send initialized state to event loop");
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(error = %e, "Failed to initialize GPU state (WASM)")
+                        }
+                    }
                 });
             }
         }
@@ -1377,7 +1402,12 @@ impl ApplicationHandler<State> for App {
                 match state.render() {
                     Ok(_) => {}
                     Err(e) => {
-                        tracing::error!("Render error: {e:?}");
+                        tracing::error!(
+                            error = ?e,
+                            width = state.config.width,
+                            height = state.config.height,
+                            "Render failed; exiting"
+                        );
                         event_loop.exit();
                     }
                 }

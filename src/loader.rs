@@ -10,6 +10,7 @@ pub async fn load_str(path: &str) -> miette::Result<String> {
 /// On native the path is resolved relative to the working directory.
 /// On WASM it is used as a URL passed to the browser's Fetch API.
 pub async fn load_bytes(path: &str) -> miette::Result<Vec<u8>> {
+    tracing::debug!(path, "loading asset");
     #[cfg(not(target_arch = "wasm32"))]
     {
         use miette::IntoDiagnostic;

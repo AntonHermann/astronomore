@@ -44,6 +44,14 @@ impl Texture {
     ) -> miette::Result<Self> {
         let img_rgba = img.to_rgba8();
         let dimensions = img.dimensions();
+        if dimensions.0 == 0 || dimensions.1 == 0 {
+            return Err(miette::miette!(
+                "Texture '{}' has zero dimension: {}x{}",
+                label,
+                dimensions.0,
+                dimensions.1
+            ));
+        }
 
         let texture_size = wgpu::Extent3d {
             width: dimensions.0,

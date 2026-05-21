@@ -1,7 +1,7 @@
 /// Loads, parses, and validates WGSL shaders with miette-formatted error messages.
 ///
 /// On failure, errors include source-highlighted spans pointing to the exact
-/// location of the syntax or validation problem — similar to Rust compiler output.
+/// location of the syntax or validation problem - similar to Rust compiler output.
 use miette::{LabeledSpan, NamedSource, SourceSpan};
 
 /// A WGSL compilation or validation error with source-span information for miette.
@@ -67,7 +67,10 @@ pub fn make_shader_module(device: &wgpu::Device, label: &str, source: &str) -> w
 fn span_to_miette(span: naga::Span) -> SourceSpan {
     span.to_range()
         .map(|r| SourceSpan::new(r.start.into(), r.len()))
-        .unwrap_or_else(|| SourceSpan::new(0.into(), 0))
+        .unwrap_or_else(|| {
+            tracing::warn!("naga span unavailable; error location is approximate");
+            SourceSpan::new(0.into(), 0)
+        })
 }
 
 fn parse_error_to_diagnostic(

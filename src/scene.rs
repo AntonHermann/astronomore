@@ -38,7 +38,7 @@ impl Scene {
         parent: Option<BodyId>,
     ) -> BodyId {
         let id = BodyId(self.celestial_bodies.len());
-        debug_assert!(
+        assert!(
             parent.as_ref().is_none_or(|p| p.0 < id.0),
             "Parent celestial body must be added before its children"
         );
@@ -52,7 +52,7 @@ impl Scene {
     fn validate_parent_ordering(&self) {
         for (i, cb) in self.celestial_bodies.iter().enumerate() {
             if let Some(parent_id) = cb.orbital_parameters.parent_id {
-                debug_assert!(
+                assert!(
                     parent_id < i,
                     "Parent celestial body must be added before its children"
                 );

@@ -62,6 +62,12 @@ impl CelestialBody {
         texture: texture::Texture,
         model_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
+        tracing::debug!(
+            name,
+            radius,
+            distance_from_parent,
+            "creating celestial body"
+        );
         let mesh = mesh::Mesh::sphere(device, 128, 64);
 
         let normals_vertices: Vec<ColorVertex> = mesh
