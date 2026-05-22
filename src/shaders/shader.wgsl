@@ -1,24 +1,30 @@
 // ==== Vertex shader ====
 
 struct CameraUniform {
+    /// Combined view and projection matrix, mapping from world space to clip space.
     view_proj: mat4x4<f32>,
 }
 @group(1) @binding(0)
 var<uniform> camera: CameraUniform;
 
 struct ModelUniform {
-    model_matrix: mat4x4<f32>,
+    /// Transform from model space to world space.
+    model_to_world_transform: mat4x4<f32>,
 }
 @group(2) @binding(0)
 var<uniform> model_transform: ModelUniform;
 
 struct VertexInput {
+    /// Position of the vertex in model space.
     @location(0) position: vec3<f32>,
+    /// Texture coordinates for the vertex, used to sample the texture in the shader.
     @location(1) tex_coords: vec2<f32>,
+    /// Normal vector at the vertex, used for lighting calculations in the shader.
     @location(2) normal: vec3<f32>,
 }
 
 struct VertexOutput {
+    /// Vertex position in clip space
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
     @location(1) body_position: vec4<f32>,
@@ -31,9 +37,10 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
     out.tex_coords = model.tex_coords;
-    let body_pos: vec4<f32> = model_transform.model_matrix * vec4<f32>(model.position, 1.0);
+    let body_pos: vec4<f32> = model_transform.model_to_world_transform * vec4<f32>(model.position, 1.0);
     out.body_position = body_pos;
-    out.body_normal = model_transform.model_matrix * vec4<f32>(model.normal, 0.0);
+    // NOTE: This only works if the model matrix has no non-uniform scaling!
+    out.body_normal = model_transform.model_to_world_transform * vec4<f32>(model.normal, 0.0);
     out.clip_position = camera.view_proj * body_pos;
     return out;
 }

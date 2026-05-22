@@ -42,6 +42,7 @@ impl Camera {
 
 #[derive(Debug, Clone)]
 pub struct FpsCamera {
+    /// Position of the camera in world space.
     pub position: glam::Vec3,
     pub yaw_rad: f32,
     pub pitch_rad: f32,
@@ -108,20 +109,13 @@ impl OrbitCamera {
 
     /// Calculate the view matrix for this camera. This is the transform that transforms world space to camera space.
     pub fn world_to_cam_matrix(&self, scene: &Scene) -> glam::Mat4 {
-        // let (sin_pitch, cos_pitch) = self.pitch_rad.sin_cos();
-        // let (sin_yaw, cos_yaw) = self.yaw_rad.sin_cos();
-
         let (target_pos, camera_pos) = self.target_and_camera_pos(scene);
 
         glam::Mat4::look_at_rh(camera_pos, target_pos, glam::Vec3::Y)
-        // glam::Mat4::look_to_rh(
-        //     self.position,
-        //     glam::Vec3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw).normalize(),
-        //     glam::Vec3::Y,
-        // )
     }
 }
 
+/// Represents the perspective projection parameters used to compute the cam to clip matrix.
 pub struct Projection {
     aspect_ratio: f32,
     fov_y_rad: f32,
@@ -298,10 +292,11 @@ impl CameraController {
     }
 }
 
-/// GPU-side view-projection matrix backing the camera bind group.
+/// View-projection matrix mapping world space to clip space.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraUniform {
+    /// Maps world space to clip space
     view_proj: [[f32; 4]; 4],
 }
 

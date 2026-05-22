@@ -9,21 +9,21 @@ const NORMAL_COLOR: [f32; 4] = [0.2, 1.0, 0.4, 1.0];
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ModelUniform {
-    pub model_matrix: [[f32; 4]; 4],
+    pub model_to_world_transform: [[f32; 4]; 4],
 }
 impl ModelUniform {
     pub fn new(world_transform: &glam::Mat4, spin_transform: &glam::Mat4, radius: f32) -> Self {
         let scale = glam::Mat4::from_scale(glam::Vec3::splat(radius));
         let model_matrix = world_transform * spin_transform * scale;
         Self {
-            model_matrix: model_matrix.to_cols_array_2d(),
+            model_to_world_transform: model_matrix.to_cols_array_2d(),
         }
     }
 }
 impl Default for ModelUniform {
     fn default() -> Self {
         Self {
-            model_matrix: glam::Mat4::IDENTITY.to_cols_array_2d(),
+            model_to_world_transform: glam::Mat4::IDENTITY.to_cols_array_2d(),
         }
     }
 }
@@ -46,8 +46,11 @@ pub struct CelestialBody {
     pub normals_mesh: GridMesh,
     pub radius: f32,
     pub orbital_parameters: OrbitalParameters,
+    /// Transform from model space to parent space (world space if no parent)
     pub orbital_transform: glam::Mat4,
+    /// Transform in model space to apply spin (e.g. rotation around its own axis)
     pub spin_transform: glam::Mat4,
+    /// Uniform containing the combined model transform (world * spin) and radius for this body, to be passed to the shader
     pub model_uniform: ModelUniform,
     pub model_buffer: wgpu::Buffer,
     pub model_bind_group: wgpu::BindGroup,

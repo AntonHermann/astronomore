@@ -3,8 +3,11 @@ use wgpu::util::DeviceExt;
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
+    /// Position of the vertex in model space.
     pub position: [f32; 3],
+    /// Texture coordinates for the vertex, used to sample the texture in the shader.
     pub tex_coords: [f32; 2],
+    /// Normal vector at the vertex, used for lighting calculations in the shader.
     pub normal: [f32; 3],
 }
 
