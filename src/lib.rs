@@ -775,11 +775,15 @@ impl ApplicationHandler<State> for App {
                     match State::new(window).await {
                         Ok(state) => {
                             if proxy.send_event(state).is_err() {
-                                tracing::error!("Failed to send initialized state to event loop");
+                                let msg = "Failed to send initialized state to event loop";
+                                tracing::error!("{msg}");
+                                wgpu::web_sys::console::error_1(&msg.into());
                             }
                         }
                         Err(e) => {
-                            tracing::error!(error = %e, "Failed to initialize GPU state (WASM)")
+                            let msg = format!("Failed to initialize GPU state (WASM): {e:?}");
+                            tracing::error!("{msg}");
+                            wgpu::web_sys::console::error_1(&msg.into());
                         }
                     }
                 });
