@@ -332,6 +332,7 @@ impl State {
         let view = &mut self.view;
         let mut cam_speed = self.camera_rig.controller.speed;
         let mut cam_sensitivity = self.camera_rig.controller.sensitivity;
+        let mut cam_zoom_sensitivity = self.camera_rig.controller.zoom_sensitivity;
         let mut reset_camera = false;
         let cam_pos = match &self.camera_rig.camera {
             Camera::Fps(camera) => camera.position,
@@ -541,6 +542,10 @@ impl State {
                             egui::Slider::new(&mut cam_sensitivity, 0.1..=5.0)
                                 .text("Empfindlichkeit"),
                         );
+                        ui.add(
+                            egui::Slider::new(&mut cam_zoom_sensitivity, 0.1..=20.0)
+                                .text("Zoom-Empfindlichkeit"),
+                        );
                         if ui.button("Zurücksetzen").clicked() {
                             reset_camera = true;
                         }
@@ -565,7 +570,7 @@ impl State {
                 ui.vertical(|ui| {
                     ui.horizontal(|ui| {
                         ui.allocate_exact_size(btn_size, egui::Sense::hover());
-                        touch.forward = held(&ui.add(dir_btn("▲")));
+                        touch.forward = held(&ui.add(dir_btn("↑")));
                         ui.allocate_exact_size(btn_size, egui::Sense::hover());
                     });
                     ui.horizontal(|ui| {
@@ -575,13 +580,15 @@ impl State {
                     });
                     ui.horizontal(|ui| {
                         ui.allocate_exact_size(btn_size, egui::Sense::hover());
-                        touch.backward = held(&ui.add(dir_btn("▼")));
+                        touch.backward = held(&ui.add(dir_btn("↓")));
                         ui.allocate_exact_size(btn_size, egui::Sense::hover());
                     });
                     ui.add_space(4.0);
                     ui.horizontal(|ui| {
-                        touch.up = held(&ui.add(dir_btn("⇧")));
-                        touch.down = held(&ui.add(dir_btn("⇩")));
+                        if cam_is_fps {
+                            touch.up = held(&ui.add(dir_btn("↑")));
+                            touch.down = held(&ui.add(dir_btn("↓")));
+                        }
                         touch.zoom_in = held(&ui.add(dir_btn("+")));
                         touch.zoom_out = held(&ui.add(dir_btn("−")));
                     });
@@ -592,6 +599,7 @@ impl State {
         self.camera_rig.controller.touch = touch;
         self.camera_rig.controller.speed = cam_speed;
         self.camera_rig.controller.sensitivity = cam_sensitivity;
+        self.camera_rig.controller.zoom_sensitivity = cam_zoom_sensitivity;
         let mode_switched = selected_is_fps != cam_is_fps;
         if mode_switched || reset_camera {
             self.camera_rig.camera = if selected_is_fps {
@@ -603,6 +611,8 @@ impl State {
             } else {
                 Camera::new_orbit(selected_target, 25.0, 0.0, 45f32.to_radians())
             };
+            self.camera_rig.controller.sensitivity = if selected_is_fps { 4.0 } else { 0.6 };
+            self.camera_rig.controller.zoom_sensitivity = 6.0;
         } else {
             match &mut self.camera_rig.camera {
                 Camera::Fps(c) => {

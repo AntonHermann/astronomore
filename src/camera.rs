@@ -163,6 +163,8 @@ pub struct CameraController {
     scroll: f32,
     pub speed: f32,
     pub sensitivity: f32,
+    /// Independent sensitivity multiplier applied to scroll and touch-zoom inputs.
+    pub zoom_sensitivity: f32,
 }
 
 /// On-screen directional buttons, set every frame from egui responses.
@@ -179,7 +181,7 @@ pub struct TouchInput {
 }
 
 impl CameraController {
-    pub fn new(speed: f32, sensitivity: f32) -> Self {
+    pub fn new(speed: f32, sensitivity: f32, zoom_sensitivity: f32) -> Self {
         Self {
             amount_left: 0.0,
             amount_right: 0.0,
@@ -195,6 +197,7 @@ impl CameraController {
             scroll: 0.0,
             speed,
             sensitivity,
+            zoom_sensitivity,
         }
     }
 
@@ -279,11 +282,15 @@ impl CameraController {
                 let scrollward =
                     glam::Vec3::new(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin)
                         .normalize();
-                camera.position += scrollward * self.scroll * self.speed * self.sensitivity * dt;
+                camera.position +=
+                    scrollward * self.scroll * self.speed * self.zoom_sensitivity * dt;
                 self.scroll = 0.0;
                 // Touch zoom buttons drive the same forward/back motion as scroll.
-                camera.position +=
-                    scrollward * (zoom_in_amt - zoom_out_amt) * self.speed * self.sensitivity * dt;
+                camera.position += scrollward
+                    * (zoom_in_amt - zoom_out_amt)
+                    * self.speed
+                    * self.zoom_sensitivity
+                    * dt;
 
                 // Move up/down. Since we don't use roll, we can just
                 // modify the y coordinate directly.
@@ -311,9 +318,10 @@ impl CameraController {
                 self.rotate_horizontal = 0.0;
                 self.rotate_vertical = 0.0;
 
-                camera.dist += self.scroll * self.speed * self.sensitivity * dt;
+                camera.dist += self.scroll * self.speed * self.zoom_sensitivity * dt;
                 self.scroll = 0.0;
-                camera.dist += (zoom_out_amt - zoom_in_amt) * self.speed * self.sensitivity * dt;
+                camera.dist +=
+                    (zoom_out_amt - zoom_in_amt) * self.speed * self.zoom_sensitivity * dt;
                 camera.dist = camera.dist.max(0.1);
             }
         }
@@ -415,7 +423,7 @@ impl CameraRig {
         Self {
             camera,
             projection,
-            controller: CameraController::new(0.5, 2.0),
+            controller: CameraController::new(0.5, 0.6, 6.0),
             mouse_pressed: false,
             bind_group_layout,
             bind_group,
