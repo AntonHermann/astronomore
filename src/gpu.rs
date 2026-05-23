@@ -59,6 +59,17 @@ impl GpuContext {
             .await
             .into_diagnostic()?;
 
+        // On WebGL2 we start from the conservative downlevel defaults but bump
+        // the resolution-related limits (texture/buffer sizes) up to whatever
+        // the actual adapter supports. Tall mobile screens (e.g. 1080×2400 at
+        // DPR 3 on Android) blow past the 2048 default and make Surface::configure
+        // panic during init.
+        let required_limits = if cfg!(target_arch = "wasm32") {
+            wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits())
+        } else {
+            wgpu::Limits::default()
+        };
+
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,
@@ -68,11 +79,7 @@ impl GpuContext {
                     wgpu::Features::POLYGON_MODE_LINE
                 },
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
-                required_limits: if cfg!(target_arch = "wasm32") {
-                    wgpu::Limits::downlevel_webgl2_defaults()
-                } else {
-                    wgpu::Limits::default()
-                },
+                required_limits,
                 memory_hints: Default::default(),
                 trace: wgpu::Trace::Off,
             })
@@ -123,13 +130,16 @@ impl GpuContext {
     }
 
     /// Reconfigure the swapchain to the new size and recreate the depth texture.
-    /// No-op if either dimension is zero.
+    /// No-op if either dimension is zero. The size is clamped to the device's
+    /// `max_texture_dimension_2d` because surfaces cannot exceed it on any
+    /// backend (and tall Android screens routinely do).
     pub fn resize(&mut self, width: u32, height: u32) {
         if width == 0 || height == 0 {
             return;
         }
-        self.config.width = width;
-        self.config.height = height;
+        let max_dim = self.device.limits().max_texture_dimension_2d;
+        self.config.width = width.min(max_dim);
+        self.config.height = height.min(max_dim);
         self.surface.configure(&self.device, &self.config);
         self.depth_texture =
             texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
