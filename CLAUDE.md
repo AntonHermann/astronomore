@@ -98,6 +98,8 @@ just san        # cargo fmt + clippy -D warnings
 - [x] Tiefenpuffer (Depth Buffer)
 - [x] `sim_time` von `f32` auf `f64` umgestellt (State, CelestialBody, Scene)
 - [ ] **TODO (ggf. vorziehen):** Orbitalkamera als `Camera::Orbit(BodyId)` – Kamera folgt einem Himmelskörper
+- [x] Mobile-Navigation: Touch-Buttons unten links (vor/zurück/links/rechts, hoch/runter, Zoom) für Bedienung ohne Tastatur
+- [x] Orbit-Kamera-Reset: Standard-Pitch 45° nach unten
 
 ### Phase 2 – Sonnensystem 3D (teilweise)
 - [x] `struct CelestialBody` mit `OrbitalParameters` – Szene als querybare Liste (`Scene` + `BodyId`)
