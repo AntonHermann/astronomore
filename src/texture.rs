@@ -131,7 +131,9 @@ impl Texture {
 /// Depth texture for use as a depth buffer in a render pass.
 impl Texture {
     // We need the DEPTH_FORMAT for creating the depth stage of the render_pipeline and for creating the depth texture itself.
-    pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+    // Depth24Plus is universally supported on WebGL2 / mobile GPUs, unlike Depth32Float
+    // which may trap on some Android drivers.
+    pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth24Plus;
 
     pub fn create_depth_texture(
         device: &wgpu::Device,
@@ -152,8 +154,9 @@ impl Texture {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: Self::DEPTH_FORMAT,
-            // Since we are rendering to this texture, we need to add the RENDER_ATTACHMENT flag to it.
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            // We only use the depth texture as a render attachment - no shader sampling.
+            // Adding TEXTURE_BINDING on WebGL2 can trip driver-side validation on Android.
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[],
         };
         let texture = device.create_texture(&desc);
