@@ -12,7 +12,9 @@ strip = false
 debug = "line-tables-only"
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]
+# `-g` preserves the WASM `name` section so browser stack traces show
+# function names instead of `wasm-function[NNNN]` indices.
+wasm-opt = ["-O", "-g", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]
 
 [dependencies]
 tracing = "0.1.44"
