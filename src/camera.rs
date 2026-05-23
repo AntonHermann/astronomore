@@ -155,11 +155,27 @@ pub struct CameraController {
     amount_down: f32,
     amount_zoom_in: f32,
     amount_zoom_out: f32,
+    /// Touch/UI-driven directional inputs, merged with the keyboard amounts in `update_camera`.
+    /// Kept separate so a held key isn't clobbered by a frame in which no button is pressed.
+    pub touch: TouchInput,
     rotate_horizontal: f32,
     rotate_vertical: f32,
     scroll: f32,
     pub speed: f32,
     pub sensitivity: f32,
+}
+
+/// On-screen directional buttons, set every frame from egui responses.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct TouchInput {
+    pub left: f32,
+    pub right: f32,
+    pub forward: f32,
+    pub backward: f32,
+    pub up: f32,
+    pub down: f32,
+    pub zoom_in: f32,
+    pub zoom_out: f32,
 }
 
 impl CameraController {
@@ -173,6 +189,7 @@ impl CameraController {
             amount_down: 0.0,
             amount_zoom_in: 0.0,
             amount_zoom_out: 0.0,
+            touch: TouchInput::default(),
             rotate_horizontal: 0.0,
             rotate_vertical: 0.0,
             scroll: 0.0,
@@ -236,15 +253,23 @@ impl CameraController {
     pub fn update_camera(&mut self, camera: &mut Camera, dt: Duration, _scene: &scene::Scene) {
         let dt = dt.as_secs_f32();
 
+        let forward_amt = self.amount_forward.max(self.touch.forward);
+        let backward_amt = self.amount_backward.max(self.touch.backward);
+        let left_amt = self.amount_left.max(self.touch.left);
+        let right_amt = self.amount_right.max(self.touch.right);
+        let up_amt = self.amount_up.max(self.touch.up);
+        let down_amt = self.amount_down.max(self.touch.down);
+        let zoom_in_amt = self.amount_zoom_in.max(self.touch.zoom_in);
+        let zoom_out_amt = self.amount_zoom_out.max(self.touch.zoom_out);
+
         match camera {
             Camera::Fps(camera) => {
                 // Move forward/backward and left/right
                 let (yaw_sin, yaw_cos) = camera.yaw_rad.sin_cos();
                 let forward = glam::Vec3::new(yaw_cos, 0.0, yaw_sin).normalize();
                 let right = glam::Vec3::new(-yaw_sin, 0.0, yaw_cos).normalize();
-                camera.position +=
-                    forward * (self.amount_forward - self.amount_backward) * self.speed * dt;
-                camera.position += right * (self.amount_right - self.amount_left) * self.speed * dt;
+                camera.position += forward * (forward_amt - backward_amt) * self.speed * dt;
+                camera.position += right * (right_amt - left_amt) * self.speed * dt;
 
                 // Move in/out (aka. "zoom")
                 // Note: this isn't an actual zoom. The camera's position
@@ -256,10 +281,13 @@ impl CameraController {
                         .normalize();
                 camera.position += scrollward * self.scroll * self.speed * self.sensitivity * dt;
                 self.scroll = 0.0;
+                // Touch zoom buttons drive the same forward/back motion as scroll.
+                camera.position +=
+                    scrollward * (zoom_in_amt - zoom_out_amt) * self.speed * self.sensitivity * dt;
 
                 // Move up/down. Since we don't use roll, we can just
                 // modify the y coordinate directly.
-                camera.position.y += (self.amount_up - self.amount_down) * self.speed * dt;
+                camera.position.y += (up_amt - down_amt) * self.speed * dt;
 
                 // Rotate
                 camera.yaw_rad += self.rotate_horizontal * self.sensitivity * dt;
@@ -277,15 +305,15 @@ impl CameraController {
             Camera::Orbit(camera) => {
                 camera.yaw_rad += self.rotate_horizontal * self.sensitivity * dt;
                 camera.pitch_rad += -self.rotate_vertical * self.sensitivity * dt;
-                camera.yaw_rad += (self.amount_right - self.amount_left) * self.speed * dt;
-                camera.pitch_rad += (self.amount_forward - self.amount_backward) * self.speed * dt;
+                camera.yaw_rad += (right_amt - left_amt) * self.speed * dt;
+                camera.pitch_rad += (forward_amt - backward_amt) * self.speed * dt;
                 camera.pitch_rad = camera.pitch_rad.clamp(-SAFE_FRAC_PI_2, SAFE_FRAC_PI_2);
                 self.rotate_horizontal = 0.0;
                 self.rotate_vertical = 0.0;
 
                 camera.dist += self.scroll * self.speed * self.sensitivity * dt;
                 self.scroll = 0.0;
-                camera.dist += (self.amount_zoom_out - self.amount_zoom_in) * self.speed * dt;
+                camera.dist += (zoom_out_amt - zoom_in_amt) * self.speed * self.sensitivity * dt;
                 camera.dist = camera.dist.max(0.1);
             }
         }

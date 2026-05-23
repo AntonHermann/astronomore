@@ -546,8 +546,50 @@ impl State {
                         }
                     });
             });
+        let mut touch = camera::TouchInput::default();
+        egui::Window::new("Navigation")
+            .title_bar(false)
+            .resizable(false)
+            .anchor(egui::Align2::LEFT_BOTTOM, egui::Vec2::new(8.0, -8.0))
+            .show(&self.ui.ctx, |ui| {
+                let btn_size = egui::Vec2::splat(40.0);
+                let dir_btn = |label: &str| egui::Button::new(label).min_size(btn_size);
+                let held = |resp: &egui::Response| -> f32 {
+                    if resp.is_pointer_button_down_on() {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                };
+                ui.spacing_mut().item_spacing = egui::Vec2::splat(4.0);
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.allocate_exact_size(btn_size, egui::Sense::hover());
+                        touch.forward = held(&ui.add(dir_btn("▲")));
+                        ui.allocate_exact_size(btn_size, egui::Sense::hover());
+                    });
+                    ui.horizontal(|ui| {
+                        touch.left = held(&ui.add(dir_btn("◀")));
+                        ui.allocate_exact_size(btn_size, egui::Sense::hover());
+                        touch.right = held(&ui.add(dir_btn("▶")));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.allocate_exact_size(btn_size, egui::Sense::hover());
+                        touch.backward = held(&ui.add(dir_btn("▼")));
+                        ui.allocate_exact_size(btn_size, egui::Sense::hover());
+                    });
+                    ui.add_space(4.0);
+                    ui.horizontal(|ui| {
+                        touch.up = held(&ui.add(dir_btn("⇧")));
+                        touch.down = held(&ui.add(dir_btn("⇩")));
+                        touch.zoom_in = held(&ui.add(dir_btn("+")));
+                        touch.zoom_out = held(&ui.add(dir_btn("−")));
+                    });
+                });
+            });
         let full_output = self.ui.ctx.end_pass();
 
+        self.camera_rig.controller.touch = touch;
         self.camera_rig.controller.speed = cam_speed;
         self.camera_rig.controller.sensitivity = cam_sensitivity;
         let mode_switched = selected_is_fps != cam_is_fps;
@@ -559,7 +601,7 @@ impl State {
                     -20f32.to_radians(),
                 )
             } else {
-                Camera::new_orbit(selected_target, 25.0, 0.0, 0.0)
+                Camera::new_orbit(selected_target, 25.0, 0.0, 45f32.to_radians())
             };
         } else {
             match &mut self.camera_rig.camera {
