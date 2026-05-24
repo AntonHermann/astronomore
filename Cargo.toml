@@ -30,6 +30,7 @@ web-time = "1"
 egui = "0.34"
 egui-wgpu = "0.34"
 egui-winit = { version = "0.34", default-features = false, features = ["links"] }
+vsop87 = "3.0.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 miette = { version = "7.6.0" }

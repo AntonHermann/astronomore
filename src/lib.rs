@@ -7,6 +7,7 @@ mod mesh;
 mod pipelines;
 mod planets;
 mod scene;
+mod scene_properties;
 mod shader_loader;
 mod sim;
 mod texture;
@@ -58,6 +59,7 @@ pub struct State {
     // diffuse_bind_group: wgpu::BindGroup,
     identity_model_bind_group: wgpu::BindGroup,
     scene: scene::Scene,
+    scene_properties: scene_properties::SceneProperties,
     sim: sim::SimState,
     camera_rig: CameraRig,
     ui: ui::EguiLayer,
@@ -117,6 +119,9 @@ impl State {
         let initial_camera = Camera::new_orbit(sun_id, 30.0, 0f32.to_radians(), 30f32.to_radians());
         let camera_rig = CameraRig::new(device, size.width, size.height, initial_camera, &scene);
 
+        // ================= Scene properties =================
+        let scene_properties = scene_properties::SceneProperties::new(device);
+
         // ================= Pipelines =================
         let pipelines = Pipelines::new(
             device,
@@ -124,6 +129,7 @@ impl State {
             &texture_bind_group_layout,
             &camera_rig.bind_group_layout,
             &scene.model_bind_group_layout,
+            &scene_properties.bind_group_layout,
         )
         .await?;
 
@@ -168,6 +174,7 @@ impl State {
             identity_model_bind_group,
             diffuse_texture,
             scene,
+            scene_properties,
             sim: sim::SimState::new(),
             camera_rig,
             ui: ui_layer,
@@ -189,6 +196,7 @@ impl State {
         self.sim.advance(dt);
         self.scene.update(self.sim.time, &self.gpu.queue);
         self.camera_rig.update(dt, &self.scene, &self.gpu.queue);
+        self.scene_properties.update(&self.gpu.queue);
     }
 
     pub fn render(&mut self) -> miette::Result<()> {
@@ -288,6 +296,8 @@ impl State {
             render_pass.set_bind_group(1, &self.camera_rig.bind_group, &[]);
             tracing::trace!(group = 2, "set bind group: identity model");
             render_pass.set_bind_group(2, &self.identity_model_bind_group, &[]);
+            tracing::trace!(group = 3, "set bind group: scene properties");
+            render_pass.set_bind_group(3, &self.scene_properties.bind_group, &[]);
 
             tracing::trace!(count = self.meshes.len(), "draw meshes");
             for mesh in &self.meshes {
@@ -386,6 +396,8 @@ impl State {
             }
         }
 
+        let mut props = self.scene_properties.uniform;
+
         let raw_input = self.ui.state.take_egui_input(&self.gpu.window);
         self.ui.ctx.begin_pass(raw_input);
         egui::Window::new("Simulation")
@@ -458,6 +470,85 @@ impl State {
                         ui.checkbox(&mut view.show_grid_xz, "XZ-Ebene (Boden)");
                         ui.checkbox(&mut view.show_grid_xy, "XY-Ebene");
                         ui.checkbox(&mut view.show_grid_yz, "YZ-Ebene");
+                    });
+                ui.separator();
+                egui::CollapsingHeader::new("Scene Properties")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        egui::Grid::new("scene_props")
+                            .num_columns(2)
+                            .striped(true)
+                            .show(ui, |ui| {
+                                ui.label("Ambient:");
+                                ui.add(
+                                    egui::Slider::new(&mut props.ambient_strength, 0.0..=1.0)
+                                        .fixed_decimals(2),
+                                );
+                                ui.end_row();
+                                ui.label("Diffuse:");
+                                ui.add(
+                                    egui::Slider::new(&mut props.diffuse_factor, 0.0..=1.0)
+                                        .fixed_decimals(2),
+                                );
+                                ui.end_row();
+                                ui.label("Specular:");
+                                ui.add(
+                                    egui::Slider::new(&mut props.specular_intensity, 0.0..=1.0)
+                                        .fixed_decimals(2),
+                                );
+                                ui.end_row();
+                                ui.label("Shininess:");
+                                ui.add(
+                                    egui::Slider::new(&mut props.shininess, 1.0..=256.0)
+                                        .logarithmic(true)
+                                        .fixed_decimals(1),
+                                );
+                                ui.end_row();
+                                ui.label("Light color:");
+                                let mut lc = [
+                                    props.light_color[0],
+                                    props.light_color[1],
+                                    props.light_color[2],
+                                ];
+                                ui.color_edit_button_rgb(&mut lc);
+                                props.light_color[0] = lc[0];
+                                props.light_color[1] = lc[1];
+                                props.light_color[2] = lc[2];
+                                ui.end_row();
+                                ui.label("Light pos X:");
+                                ui.add(
+                                    egui::DragValue::new(&mut props.light_position[0]).speed(0.1),
+                                );
+                                ui.end_row();
+                                ui.label("Light pos Y:");
+                                ui.add(
+                                    egui::DragValue::new(&mut props.light_position[1]).speed(0.1),
+                                );
+                                ui.end_row();
+                                ui.label("Light pos Z:");
+                                ui.add(
+                                    egui::DragValue::new(&mut props.light_position[2]).speed(0.1),
+                                );
+                                ui.end_row();
+                                ui.label("Texture:");
+                                let mut use_tex = props.use_texture != 0;
+                                ui.checkbox(&mut use_tex, "");
+                                props.use_texture = use_tex as u32;
+                                ui.end_row();
+                                if !use_tex {
+                                    ui.label("Object color:");
+                                    let mut oc = [
+                                        props.object_color[0],
+                                        props.object_color[1],
+                                        props.object_color[2],
+                                    ];
+                                    ui.color_edit_button_rgb(&mut oc);
+                                    props.object_color[0] = oc[0];
+                                    props.object_color[1] = oc[1];
+                                    props.object_color[2] = oc[2];
+                                    ui.end_row();
+                                }
+                            });
                     });
                 ui.separator();
                 egui::CollapsingHeader::new("Kamera")
@@ -609,6 +700,7 @@ impl State {
             });
         let full_output = self.ui.ctx.end_pass();
 
+        self.scene_properties.uniform = props;
         self.camera_rig.controller.touch = touch;
         self.camera_rig.controller.speed = cam_speed;
         self.camera_rig.controller.sensitivity = cam_sensitivity;

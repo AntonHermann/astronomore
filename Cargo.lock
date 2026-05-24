@@ -149,6 +149,7 @@ dependencies = [
  "pollster",
  "tracing",
  "tracing-subscriber",
+ "vsop87",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-tracing",
@@ -2743,6 +2744,12 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "vsop87"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37cde47f1fc639613a2a48a6a8685db063693c55ea6b09260b78f95c9e775575"
 
 [[package]]
 name = "walkdir"

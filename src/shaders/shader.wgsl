@@ -2,7 +2,7 @@
 
 struct CameraUniform {
     /// Combined view and projection matrix, mapping from world space to clip space.
-    view_proj: mat4x4<f32>, 
+    view_proj: mat4x4<f32>,
     /// Camera position in world space
     camera_pos: vec3<f32>,
 }
@@ -15,6 +15,25 @@ struct ModelUniform {
 }
 @group(2) @binding(0)
 var<uniform> model_transform: ModelUniform;
+
+struct SceneProperties {
+    ambient_strength: f32,
+    diffuse_factor: f32,
+    specular_intensity: f32,
+    shininess: f32,
+    use_texture: u32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
+    /// RGB light colour; w ignored.
+    light_color: vec4<f32>,
+    /// Light position in world space; w ignored.
+    light_position: vec4<f32>,
+    /// Flat object colour used when use_texture == 0; w ignored.
+    object_color: vec4<f32>,
+}
+@group(3) @binding(0)
+var<uniform> scene_props: SceneProperties;
 
 struct VertexInput {
     /// Position of the vertex in model space.
@@ -57,33 +76,35 @@ var s_diffuse: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let object_color = textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    var base_color: vec3<f32>;
+    if scene_props.use_texture != 0u {
+        base_color = textureSample(t_diffuse, s_diffuse, in.tex_coords).rgb;
+    } else {
+        base_color = scene_props.object_color.xyz;
+    }
 
-    let sun_color = vec3<f32>(1.0, 1.0, 1.0);
-    let sun_pos = vec3<f32>(0.0, 0.0, 0.0);
+    let light_color = scene_props.light_color.xyz;
+    let light_pos   = scene_props.light_position.xyz;
 
     // Re-normalize after interpolation across the triangle.
     let N = normalize(in.body_normal.xyz);
-    let L = normalize(sun_pos - in.body_position.xyz);
+    let L = normalize(light_pos - in.body_position.xyz);
     let V = normalize(camera.camera_pos - in.body_position.xyz);
     let H = normalize(L + V);
 
-    // ==== Ambient Color ==== //
-    let ambient_strength = 0.05;
-    let ambient_color = sun_color * ambient_strength;
+    // ==== Ambient ====
+    let ambient_color = light_color * scene_props.ambient_strength;
 
-    // ==== Diffuse Color ==== //
-    let diffuse_factor = 0.5;
-    let diffuse_color = sun_color * diffuse_factor * max(dot(L, N), 0.0);
+    // ==== Diffuse ====
+    let diffuse_color = light_color * scene_props.diffuse_factor * max(dot(L, N), 0.0);
 
-    // ==== Specular Color ==== //
-    let specular_intensity = 0.5;
-    let specular_shininess = 64.0;
-    let specular_color = sun_color * specular_intensity * pow(max(dot(H, N), 0.0), specular_shininess);
+    // ==== Specular (Blinn-Phong) ====
+    let specular_color = light_color * scene_props.specular_intensity
+        * pow(max(dot(H, N), 0.0), scene_props.shininess);
 
-    var out_color = (ambient_color + diffuse_color + specular_color) * object_color.rgb;
+    let out_color = (ambient_color + diffuse_color + specular_color) * base_color;
 
-    return vec4<f32>(out_color, object_color.a);
+    return vec4<f32>(out_color, 1.0);
 }
 
 @fragment
