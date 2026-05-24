@@ -741,8 +741,8 @@ impl State {
                 let screen_x = (ndc_x + 1.0) * 0.5 * screen_w / ppp;
                 let screen_y = (1.0 - ndc_y) * 0.5 * screen_h / ppp;
                 painter.text(
-                    egui::pos2(screen_x, screen_y),
-                    egui::Align2::CENTER_BOTTOM,
+                    egui::pos2(screen_x, screen_y + 8.0),
+                    egui::Align2::CENTER_TOP,
                     name.as_str(),
                     egui::FontId::proportional(13.0),
                     egui::Color32::from_rgba_unmultiplied(255, 255, 255, 200),
