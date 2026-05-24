@@ -31,11 +31,8 @@ impl Default for ModelUniform {
 pub struct OrbitalParameters {
     /// Optional index of the parent celestial body in the scene's celestial_bodies list. None if this is a root body (e.g. the sun)
     pub parent_id: Option<usize>,
-    /// Distance from the parent body
-    /// TODO: unit?
-    pub radius: f32,
-    /// Angular velocity in radians per second
-    pub angular_velocity: f32,
+    /// Determines how the orbital position is computed each frame.
+    pub model: crate::orbital::OrbitalModel,
 }
 
 pub struct CelestialBody {
@@ -59,18 +56,12 @@ impl CelestialBody {
     pub fn new(
         device: &wgpu::Device,
         name: &str,
-        distance_from_parent: f32,
         radius: f32,
-        angular_velocity: f32,
+        model: crate::orbital::OrbitalModel,
         texture: texture::Texture,
         model_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        tracing::debug!(
-            name,
-            radius,
-            distance_from_parent,
-            "creating celestial body"
-        );
+        tracing::debug!(name, radius, "creating celestial body");
         let mesh = mesh::Mesh::sphere(device, 128, 64);
 
         let normals_vertices: Vec<ColorVertex> = mesh
@@ -98,8 +89,7 @@ impl CelestialBody {
 
         let orbital_parameters = OrbitalParameters {
             parent_id: None,
-            radius: distance_from_parent,
-            angular_velocity,
+            model,
         };
 
         let model_uniform = ModelUniform::new(&glam::Mat4::IDENTITY, &glam::Mat4::IDENTITY, radius);
@@ -135,16 +125,20 @@ impl CelestialBody {
     }
 
     pub fn update(&mut self, sim_time: f64) {
-        let sim_time = sim_time as f32;
-        let angle = self.orbital_parameters.angular_velocity * sim_time;
-        let pos = glam::Vec3::new(
-            self.orbital_parameters.radius * angle.cos(),
-            0.,
-            self.orbital_parameters.radius * angle.sin(),
-        );
+        use crate::orbital::OrbitalModel;
+        let pos = match self.orbital_parameters.model {
+            OrbitalModel::Fixed => glam::Vec3::ZERO,
+            OrbitalModel::Parametric {
+                radius,
+                angular_velocity,
+            } => {
+                let angle = angular_velocity * sim_time as f32;
+                glam::Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin())
+            }
+            OrbitalModel::Vsop87 { body } => crate::orbital::heliocentric_position(body, sim_time),
+        };
         self.orbital_transform = glam::Mat4::from_translation(pos);
-
-        self.spin_transform = glam::Mat4::from_rotation_y(0.1 * sim_time);
+        self.spin_transform = glam::Mat4::from_rotation_y(0.1 * sim_time as f32);
     }
 
     /// Update the model uniform based on its absolute world transform (i.e. combined with parent transforms) and its spin transform

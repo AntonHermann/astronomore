@@ -4,6 +4,7 @@ mod gpu;
 mod grid;
 mod loader;
 mod mesh;
+pub mod orbital;
 mod pipelines;
 mod planets;
 mod scene;
@@ -101,9 +102,8 @@ impl State {
                 CelestialBody::new(
                     device,
                     def.name,
-                    def.distance_from_parent,
                     def.radius,
-                    def.angular_velocity,
+                    def.orbital_model,
                     texture,
                     &scene.model_bind_group_layout,
                 ),
@@ -407,6 +407,8 @@ impl State {
             .anchor(egui::Align2::RIGHT_TOP, egui::Vec2::new(-8.0, 8.0))
             .show(&self.ui.ctx, |ui| {
                 ui.label(format!("FPS: {:.0}", fps));
+                let (y, m, d) = orbital::jde_to_gregorian(orbital::sim_time_to_jde(sim.time));
+                ui.label(format!("Datum: {:04}-{:02}-{:02}", y, m, d));
                 ui.separator();
                 ui.label(format!(
                     "Zeit-Faktor: {}x",
