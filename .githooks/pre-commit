@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Pre-commit performance benchmark hook.
+# Skip with: SKIP_BENCH=1 git commit
+set -euo pipefail
+
+if [ "${SKIP_BENCH:-0}" = "1" ]; then
+    echo "[perf] Skipped (SKIP_BENCH=1)"
+    exit 0
+fi
+
+echo "[perf] Building benchmark (release)…"
+t0=$(date +%s%3N)
+cargo build --release --bin bench --quiet
+t1=$(date +%s%3N)
+build_ms=$(( t1 - t0 ))
+
+echo "[perf] Running…"
+tmpfile=$(mktemp)
+trap 'rm -f "$tmpfile"' EXIT
+./target/release/bench > "$tmpfile"
+
+tree=$(git write-tree)
+branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "detached")
+date_str=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+python3 scripts/bench-record.py "$tmpfile" \
+    --tree="$tree" \
+    --branch="$branch" \
+    --date="$date_str" \
+    --build-ms="$build_ms" \
+    --ndjson=perf/benchmarks.ndjson \
+    --markdown=perf/benchmarks.md
+
+git add perf/benchmarks.ndjson perf/benchmarks.md
+echo "[perf] Recorded — build: ${build_ms}ms"

@@ -1,15 +1,15 @@
 mod camera;
-mod celestial_body;
+pub mod celestial_body;
 mod gpu;
 mod grid;
 mod loader;
-mod mesh;
+pub mod mesh;
 mod pipelines;
 mod planets;
-mod scene;
-mod shader_loader;
+pub mod scene;
+pub mod shader_loader;
 mod sim;
-mod texture;
+pub mod texture;
 mod ui;
 
 use std::sync::Arc;
