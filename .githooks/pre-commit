@@ -8,6 +8,11 @@ if [ "${SKIP_BENCH:-0}" = "1" ]; then
     exit 0
 fi
 
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "[perf] python3 is required to record benchmark history" >&2
+    exit 1
+fi
+
 echo "[perf] Building benchmark (release)…"
 # python3 is already required for bench-record.py; use it here for portable ms timing
 t0=$(python3 -c 'import time; print(int(time.time()*1000))')
