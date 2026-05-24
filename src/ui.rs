@@ -17,6 +17,8 @@ pub struct ViewOptions {
     pub sphere_meridians: u32,
     /// Latitude segments for sphere tessellation (parallels).
     pub sphere_parallels: u32,
+    /// Show name labels for each celestial body as a screen-space overlay.
+    pub show_body_names: bool,
 }
 
 impl ViewOptions {
@@ -30,6 +32,7 @@ impl ViewOptions {
             show_grid_yz: false,
             sphere_meridians: 128,
             sphere_parallels: 64,
+            show_body_names: false,
         }
     }
 
@@ -48,6 +51,12 @@ impl ViewOptions {
     /// True if at least one grid plane is currently visible.
     pub fn any_grid_visible(&self) -> bool {
         self.show_grid_xz || self.show_grid_xy || self.show_grid_yz
+    }
+
+    /// Flip the body-name overlay flag.
+    pub fn toggle_body_names(&mut self) {
+        self.show_body_names = !self.show_body_names;
+        tracing::info!("Body name labels: {}", self.show_body_names);
     }
 
     /// G-key semantics: if any grid is visible, hide all; otherwise show all three.
