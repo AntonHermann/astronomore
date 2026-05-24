@@ -37,6 +37,7 @@ impl Pipelines {
         texture_bg_layout: &wgpu::BindGroupLayout,
         camera_bg_layout: &wgpu::BindGroupLayout,
         model_bg_layout: &wgpu::BindGroupLayout,
+        scene_props_bg_layout: &wgpu::BindGroupLayout,
     ) -> miette::Result<Self> {
         let main_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
@@ -44,6 +45,7 @@ impl Pipelines {
                 Some(texture_bg_layout),
                 Some(camera_bg_layout),
                 Some(model_bg_layout),
+                Some(scene_props_bg_layout),
             ],
             immediate_size: 0,
         });
