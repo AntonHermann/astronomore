@@ -1,1 +1,2 @@
 {"shader_validation_us": 270, "n_shader": 100, "gpu_skipped": true, "tree": "0ea339a0ef6bdb171a466ad999f95d572d884c37", "date": "2026-05-24T05:56:50Z", "branch": "claude/precommit-perf-benchmarks-3CqS5", "build_ms": 276}
+{"shader_validation_us": 292, "n_shader": 100, "gpu_skipped": true, "tree": "3cb8467b0058d13de71fba8d955b1a88437050e1", "date": "2026-05-24T06:04:55Z", "branch": "claude/precommit-perf-benchmarks-3CqS5", "build_ms": 1450}

@@ -7,6 +7,12 @@
 //!   A. shader_validation_us — naga parse+validate on both WGSL shaders (CPU only)
 //!   B. sphere_128_64_us     — Mesh::sphere(128, 64) creation (CPU tess + GPU upload)
 //!   C. scene_update_us      — Scene::update() per frame on a 2-body scene
+//!
+//! TODO: add frame time / FPS benchmark (bench D).
+//!   Requires either GPU timestamp queries (wgpu::QueryType::Timestamp,
+//!   feature TIMESTAMP_QUERY) to measure render pass duration on the GPU side,
+//!   or a headless swapchain alternative (render to texture + readback).
+//!   Neither needs a window — both are doable with the existing headless device.
 
 use astronomore::{
     celestial_body::CelestialBody,
