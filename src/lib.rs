@@ -466,6 +466,18 @@ impl State {
                 {
                     view.toggle_normals();
                 }
+                let names_label = if view.show_body_names {
+                    "Beschriftungen: an"
+                } else {
+                    "Beschriftungen: aus"
+                };
+                if ui
+                    .button(names_label)
+                    .on_hover_text("Umschalten (L)")
+                    .clicked()
+                {
+                    view.toggle_body_names();
+                }
                 ui.separator();
                 egui::CollapsingHeader::new("Gitternetz")
                     .default_open(false)
@@ -709,6 +721,49 @@ impl State {
                     });
                 });
             });
+        if self.view.show_body_names {
+            let painter = self.ui.ctx.layer_painter(egui::LayerId::new(
+                egui::Order::Foreground,
+                egui::Id::new("body_name_labels"),
+            ));
+            let ppp = self.ui.ctx.pixels_per_point();
+            let screen_w = self.gpu.config.width as f32;
+            let screen_h = self.gpu.config.height as f32;
+            let view_proj = self.camera_rig.projection.cam_to_clip_matrix()
+                * self.camera_rig.camera.world_to_cam_matrix(&self.scene);
+
+            for (body_id, name) in &body_list {
+                let world_pos = self
+                    .scene
+                    .get_body_orbital_transform(*body_id)
+                    .transform_point3(glam::Vec3::ZERO);
+                let clip_pos =
+                    view_proj * glam::Vec4::new(world_pos.x, world_pos.y, world_pos.z, 1.0);
+
+                if clip_pos.w <= 0.0 {
+                    continue;
+                }
+                let ndc_x = clip_pos.x / clip_pos.w;
+                let ndc_y = clip_pos.y / clip_pos.w;
+                let ndc_z = clip_pos.z / clip_pos.w;
+                if !(0.0..=1.0).contains(&ndc_z)
+                    || !(-1.0..=1.0).contains(&ndc_x)
+                    || !(-1.0..=1.0).contains(&ndc_y)
+                {
+                    continue;
+                }
+
+                let screen_x = (ndc_x + 1.0) * 0.5 * screen_w / ppp;
+                let screen_y = (1.0 - ndc_y) * 0.5 * screen_h / ppp;
+                painter.text(
+                    egui::pos2(screen_x, screen_y),
+                    egui::Align2::CENTER_BOTTOM,
+                    name.as_str(),
+                    egui::FontId::proportional(13.0),
+                    egui::Color32::from_rgba_unmultiplied(255, 255, 255, 200),
+                );
+            }
+        }
         let full_output = self.ui.ctx.end_pass();
 
         self.scene_properties.uniform = props;
@@ -830,6 +885,8 @@ impl State {
             self.sim.toggle_pause();
         } else if code == KeyCode::KeyG && state.is_pressed() {
             self.view.toggle_all_grids();
+        } else if code == KeyCode::KeyL && state.is_pressed() {
+            self.view.toggle_body_names();
         } else {
             self.camera_rig.controller.handle_key(code, state);
         }
