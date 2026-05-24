@@ -408,10 +408,10 @@ impl State {
             .show(&self.ui.ctx, |ui| {
                 ui.label(format!("FPS: {:.0}", fps));
                 let (y, m, d) = orbital::jde_to_gregorian(orbital::sim_time_to_jde(sim.time));
-                ui.label(format!("Datum: {:04}-{:02}-{:02}", y, m, d));
+                ui.label(format!("Date: {:04}-{:02}-{:02}", y, m, d));
                 ui.separator();
                 ui.label(format!(
-                    "Zeit-Faktor: {}x",
+                    "Time factor: {}x",
                     if sim.multiplier.fract() == 0.0 {
                         format!("{}", sim.multiplier as i32)
                     } else {
@@ -419,73 +419,61 @@ impl State {
                     }
                 ));
                 ui.horizontal(|ui| {
-                    if ui
-                        .button("◀◀")
-                        .on_hover_text("Halbieren (PageDown)")
-                        .clicked()
-                    {
+                    if ui.button("◀◀").on_hover_text("Halve (PageDown)").clicked() {
                         sim.halve_speed();
                     }
                     let pause_label = if sim.is_paused { "▶" } else { "⏸" };
                     if ui.button(pause_label).on_hover_text("Pause (P)").clicked() {
                         sim.toggle_pause();
                     }
-                    if ui
-                        .button("▶▶")
-                        .on_hover_text("Verdoppeln (PageUp)")
-                        .clicked()
-                    {
+                    if ui.button("▶▶").on_hover_text("Double (PageUp)").clicked() {
                         sim.double_speed();
                     }
-                    if ui.button("1×").on_hover_text("Zurücksetzen (0)").clicked() {
+                    if ui.button("1×").on_hover_text("Reset (0)").clicked() {
                         sim.reset_speed();
                     }
                 });
                 ui.separator();
                 let wireframe_label = if view.wireframe {
-                    "Wireframe: an"
+                    "Wireframe: on"
                 } else {
-                    "Wireframe: aus"
+                    "Wireframe: off"
                 };
                 if ui
                     .button(wireframe_label)
-                    .on_hover_text("Umschalten (Tab)")
+                    .on_hover_text("Toggle (Tab)")
                     .clicked()
                 {
                     view.toggle_wireframe();
                 }
                 let normals_label = if view.show_normals {
-                    "Normalen: an"
+                    "Normals: on"
                 } else {
-                    "Normalen: aus"
+                    "Normals: off"
                 };
                 if ui
                     .button(normals_label)
-                    .on_hover_text("Umschalten (N)")
+                    .on_hover_text("Toggle (N)")
                     .clicked()
                 {
                     view.toggle_normals();
                 }
                 let names_label = if view.show_body_names {
-                    "Beschriftungen: an"
+                    "Labels: on"
                 } else {
-                    "Beschriftungen: aus"
+                    "Labels: off"
                 };
-                if ui
-                    .button(names_label)
-                    .on_hover_text("Umschalten (L)")
-                    .clicked()
-                {
+                if ui.button(names_label).on_hover_text("Toggle (L)").clicked() {
                     view.toggle_body_names();
                 }
                 ui.separator();
-                egui::CollapsingHeader::new("Gitternetz")
+                egui::CollapsingHeader::new("Grid")
                     .default_open(false)
                     .show(ui, |ui| {
-                        ui.label("G = alle umschalten");
-                        ui.checkbox(&mut view.show_grid_xz, "XZ-Ebene (Boden)");
-                        ui.checkbox(&mut view.show_grid_xy, "XY-Ebene");
-                        ui.checkbox(&mut view.show_grid_yz, "YZ-Ebene");
+                        ui.label("G = toggle all");
+                        ui.checkbox(&mut view.show_grid_xz, "XZ plane (ground)");
+                        ui.checkbox(&mut view.show_grid_xy, "XY plane");
+                        ui.checkbox(&mut view.show_grid_yz, "YZ plane");
                     });
                 ui.separator();
                 egui::CollapsingHeader::new("Scene Properties")
@@ -574,11 +562,11 @@ impl State {
                             });
                     });
                 ui.separator();
-                egui::CollapsingHeader::new("Kamera")
+                egui::CollapsingHeader::new("Camera")
                     .default_open(false)
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label("Modus:");
+                            ui.label("Mode:");
                             ui.radio_value(&mut selected_is_fps, true, "FPS");
                             ui.radio_value(&mut selected_is_fps, false, "Orbit");
                         });
@@ -613,7 +601,7 @@ impl State {
                                     );
                                     ui.end_row();
                                 } else {
-                                    ui.label("Ziel:");
+                                    ui.label("Target:");
                                     let selected_text = body_list
                                         .iter()
                                         .find(|(id, _)| *id == selected_target)
@@ -631,7 +619,7 @@ impl State {
                                             }
                                         });
                                     ui.end_row();
-                                    ui.label("Abstand:");
+                                    ui.label("Distance:");
                                     ui.add(
                                         egui::DragValue::new(&mut orbit_dist)
                                             .speed(0.1)
@@ -662,18 +650,15 @@ impl State {
                                 }
                             });
                         ui.separator();
+                        ui.add(egui::Slider::new(&mut cam_speed, 0.05..=4.0).text("Speed"));
                         ui.add(
-                            egui::Slider::new(&mut cam_speed, 0.05..=4.0).text("Geschwindigkeit"),
-                        );
-                        ui.add(
-                            egui::Slider::new(&mut cam_sensitivity, 0.1..=5.0)
-                                .text("Empfindlichkeit"),
+                            egui::Slider::new(&mut cam_sensitivity, 0.1..=5.0).text("Sensitivity"),
                         );
                         ui.add(
                             egui::Slider::new(&mut cam_zoom_sensitivity, 0.1..=20.0)
-                                .text("Zoom-Empfindlichkeit"),
+                                .text("Zoom sensitivity"),
                         );
-                        if ui.button("Zurücksetzen").clicked() {
+                        if ui.button("Reset").clicked() {
                             reset_camera = true;
                         }
                     });
