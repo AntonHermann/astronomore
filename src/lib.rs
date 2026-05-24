@@ -351,6 +351,8 @@ impl State {
         } else {
             0.0
         };
+        let prev_meridians = self.view.sphere_meridians;
+        let prev_parallels = self.view.sphere_parallels;
         let sim = &mut self.sim;
         let view = &mut self.view;
         let mut cam_speed = self.camera_rig.controller.speed;
@@ -548,6 +550,13 @@ impl State {
                                     props.object_color[2] = oc[2];
                                     ui.end_row();
                                 }
+                                ui.separator();
+                                ui.label("Meridians:");
+                                ui.add(egui::Slider::new(&mut view.sphere_meridians, 3..=128));
+                                ui.end_row();
+                                ui.label("Parallels:");
+                                ui.add(egui::Slider::new(&mut view.sphere_parallels, 1..=64));
+                                ui.end_row();
                             });
                     });
                 ui.separator();
@@ -701,6 +710,14 @@ impl State {
         let full_output = self.ui.ctx.end_pass();
 
         self.scene_properties.uniform = props;
+        if self.view.sphere_meridians != prev_meridians
+            || self.view.sphere_parallels != prev_parallels
+        {
+            let (m, p) = (self.view.sphere_meridians, self.view.sphere_parallels);
+            for body in &mut self.scene.celestial_bodies {
+                body.rebuild_mesh(&self.gpu.device, m, p);
+            }
+        }
         self.camera_rig.controller.touch = touch;
         self.camera_rig.controller.speed = cam_speed;
         self.camera_rig.controller.sensitivity = cam_sensitivity;

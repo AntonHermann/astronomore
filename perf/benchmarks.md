@@ -5,3 +5,4 @@
 | 0ea339a0 | 2026-05-24 | claude/precommit-perf-benchmarks-3CqS5 | 276 | 270 | — | — |
 | 3cb8467b | 2026-05-24 | claude/precommit-perf-benchmarks-3CqS5 | 1450 (+425%) ⚠️ | 292 (+8%) | — | — |
 | f8e778c6 | 2026-05-24 | claude/precommit-perf-benchmarks-3CqS5 | 42576 (+2836%) ⚠️ | 208 (-29%) | — | — |
+| c2c3fb1a | 2026-05-24 | main | 124285 (+192%) ⚠️ | 314 (+51%) ⚠️ | 741 | 3 |

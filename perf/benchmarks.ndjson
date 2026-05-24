@@ -1,3 +1,4 @@
 {"shader_validation_us": 270, "n_shader": 100, "gpu_skipped": true, "tree": "0ea339a0ef6bdb171a466ad999f95d572d884c37", "date": "2026-05-24T05:56:50Z", "branch": "claude/precommit-perf-benchmarks-3CqS5", "build_ms": 276}
 {"shader_validation_us": 292, "n_shader": 100, "gpu_skipped": true, "tree": "3cb8467b0058d13de71fba8d955b1a88437050e1", "date": "2026-05-24T06:04:55Z", "branch": "claude/precommit-perf-benchmarks-3CqS5", "build_ms": 1450}
 {"shader_validation_us": 208, "n_shader": 100, "gpu_skipped": true, "tree": "f8e778c6ee962c0e2894de106a6da3ae8db28f02", "date": "2026-05-24T06:38:31Z", "branch": "claude/precommit-perf-benchmarks-3CqS5", "build_ms": 42576}
+{"shader_validation_us": 314, "sphere_128_64_us": 741, "scene_update_us": 3, "n_shader": 100, "n_sphere": 50, "n_scene": 1000, "gpu_skipped": false, "tree": "c2c3fb1a64a7e1cc1c59a4d2636c57cfb164a653", "date": "2026-05-24T07:35:45Z", "branch": "main", "build_ms": 124285}
