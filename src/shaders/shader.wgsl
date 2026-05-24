@@ -2,7 +2,9 @@
 
 struct CameraUniform {
     /// Combined view and projection matrix, mapping from world space to clip space.
-    view_proj: mat4x4<f32>,
+    view_proj: mat4x4<f32>, 
+    /// Camera position in world space
+    camera_pos: vec3<f32>,
 }
 @group(1) @binding(0)
 var<uniform> camera: CameraUniform;
@@ -55,21 +57,33 @@ var s_diffuse: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let object_color = textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    // let object_color = textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    let object_color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
 
     let sun_color = vec3<f32>(1.0, 1.0, 1.0);
     let sun_pos = vec4<f32>(0., 0., 0., 1.);
 
     // ==== Ambient Color ==== //
-    let ambient_strength = 0.1;
+    let ambient_strength = 0.05;
     let ambient_color = sun_color * ambient_strength;
     
     // ==== Diffuse Color ==== //
     let light_dir = sun_pos - in.body_position;
-    let diffuse_strength = max(dot(light_dir, in.body_normal), 0);
-    let diffuse_color = sun_color * diffuse_strength;
+    // saturate to keep with 0-1 range.
+    let diffuse_strength = saturate(max(dot(light_dir, in.body_normal), 0));
+    let diffuse_factor = 0.5;
+    let diffuse_color = sun_color * diffuse_factor * diffuse_strength;
+
+    // ==== Specular Color ==== //
+    let camera_dir = vec4<f32>(camera.camera_pos, 1.0) - in.body_position;
+    let halfway = normalize(light_dir + camera_dir);
+
+    let n_dot_h = max(dot(halfway, in.body_normal), 0);
+    let specular_hardness = .5;
+    let specular_strength = pow(saturate(n_dot_h), specular_hardness);
+    let specular_color = sun_color * specular_hardness * specular_strength;
     
-    var out_color = (ambient_color + diffuse_color) * object_color.rgb;
+    var out_color = (ambient_color + diffuse_color + specular_color) * object_color.rgb;
 
     return vec4<f32>(out_color, object_color.a);
 }
