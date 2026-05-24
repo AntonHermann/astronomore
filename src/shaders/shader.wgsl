@@ -57,8 +57,8 @@ var s_diffuse: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // let object_color = textureSample(t_diffuse, s_diffuse, in.tex_coords);
-    let object_color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
+    let object_color = textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    // let object_color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
 
     let sun_color = vec3<f32>(1.0, 1.0, 1.0);
     let sun_pos = vec4<f32>(0., 0., 0., 1.);
