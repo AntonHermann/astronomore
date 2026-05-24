@@ -13,6 +13,10 @@ pub struct ViewOptions {
     pub show_grid_xy: bool,
     /// Show the YZ grid (side-facing plane).
     pub show_grid_yz: bool,
+    /// Longitude segments for sphere tessellation (meridians).
+    pub sphere_meridians: u32,
+    /// Latitude segments for sphere tessellation (parallels).
+    pub sphere_parallels: u32,
 }
 
 impl ViewOptions {
@@ -24,6 +28,8 @@ impl ViewOptions {
             show_grid_xz: true,
             show_grid_xy: false,
             show_grid_yz: false,
+            sphere_meridians: 128,
+            sphere_parallels: 64,
         }
     }
 

@@ -151,6 +151,35 @@ impl CelestialBody {
     pub fn update_model_uniform(&mut self, world_transform: glam::Mat4) {
         self.model_uniform = ModelUniform::new(&world_transform, &self.spin_transform, self.radius);
     }
+
+    /// Rebuild the sphere mesh and normals overlay with new tessellation parameters.
+    pub fn rebuild_mesh(&mut self, device: &wgpu::Device, meridians: u32, parallels: u32) {
+        let new_mesh = mesh::Mesh::sphere(device, meridians, parallels);
+        let normals_vertices: Vec<ColorVertex> = new_mesh
+            .vertices
+            .iter()
+            .flat_map(|v| {
+                let end = [
+                    v.position[0] + v.normal[0] * NORMAL_SCALE,
+                    v.position[1] + v.normal[1] * NORMAL_SCALE,
+                    v.position[2] + v.normal[2] * NORMAL_SCALE,
+                ];
+                [
+                    ColorVertex {
+                        position: v.position,
+                        color: NORMAL_COLOR,
+                    },
+                    ColorVertex {
+                        position: end,
+                        color: NORMAL_COLOR,
+                    },
+                ]
+            })
+            .collect();
+        self.normals_mesh =
+            GridMesh::build(device, &format!("{} Normals", self.name), normals_vertices);
+        self.mesh = new_mesh;
+    }
 }
 
 pub trait DrawCelestialBody<'a> {
