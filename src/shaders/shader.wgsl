@@ -58,31 +58,29 @@ var s_diffuse: sampler;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let object_color = textureSample(t_diffuse, s_diffuse, in.tex_coords);
-    // let object_color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
 
     let sun_color = vec3<f32>(1.0, 1.0, 1.0);
-    let sun_pos = vec4<f32>(0., 0., 0., 1.);
+    let sun_pos = vec3<f32>(0.0, 0.0, 0.0);
+
+    // Re-normalize after interpolation across the triangle.
+    let N = normalize(in.body_normal.xyz);
+    let L = normalize(sun_pos - in.body_position.xyz);
+    let V = normalize(camera.camera_pos - in.body_position.xyz);
+    let H = normalize(L + V);
 
     // ==== Ambient Color ==== //
     let ambient_strength = 0.05;
     let ambient_color = sun_color * ambient_strength;
-    
+
     // ==== Diffuse Color ==== //
-    let light_dir = sun_pos - in.body_position;
-    // saturate to keep with 0-1 range.
-    let diffuse_strength = saturate(max(dot(light_dir, in.body_normal), 0));
     let diffuse_factor = 0.5;
-    let diffuse_color = sun_color * diffuse_factor * diffuse_strength;
+    let diffuse_color = sun_color * diffuse_factor * max(dot(L, N), 0.0);
 
     // ==== Specular Color ==== //
-    let camera_dir = vec4<f32>(camera.camera_pos, 1.0) - in.body_position;
-    let halfway = normalize(light_dir + camera_dir);
+    let specular_intensity = 0.5;
+    let specular_shininess = 64.0;
+    let specular_color = sun_color * specular_intensity * pow(max(dot(H, N), 0.0), specular_shininess);
 
-    let n_dot_h = max(dot(halfway, in.body_normal), 0);
-    let specular_hardness = .5;
-    let specular_strength = pow(saturate(n_dot_h), specular_hardness);
-    let specular_color = sun_color * specular_hardness * specular_strength;
-    
     var out_color = (ambient_color + diffuse_color + specular_color) * object_color.rgb;
 
     return vec4<f32>(out_color, object_color.a);
