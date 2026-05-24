@@ -38,6 +38,14 @@ impl Camera {
             Camera::Orbit(camera) => camera.world_to_cam_matrix(scene),
         }
     }
+
+    /// Returns the position of the camera in world space.
+    pub fn position(&self, scene: &Scene) -> glam::Vec3 {
+        match self {
+            Camera::Fps(cam) => cam.position,
+            Camera::Orbit(cam) => cam.position(scene),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -96,6 +104,12 @@ impl OrbitCamera {
             * glam::Mat4::from_rotation_x(-self.pitch_rad);
         let camera_translation = glam::Mat4::from_translation(glam::Vec3::new(0.0, 0.0, self.dist));
         camera_rotation * camera_translation
+    }
+
+    /// Returns the position of the camera in world space.
+    pub fn position(&self, scene: &Scene) -> glam::Vec3 {
+        let (_target_pos, camera_pos) = self.target_and_camera_pos(scene);
+        camera_pos
     }
 
     pub fn target_and_camera_pos(&self, scene: &Scene) -> (glam::Vec3, glam::Vec3) {
@@ -334,6 +348,10 @@ impl CameraController {
 pub struct CameraUniform {
     /// Maps world space to clip space
     view_proj: [[f32; 4]; 4],
+    /// Camera position in world space
+    camera_pos: [f32; 3],
+    /// Padding to match WGSL's vec3<f32> alignment (16 bytes in uniforms)
+    _padding: f32,
 }
 
 impl CameraUniform {
@@ -341,6 +359,8 @@ impl CameraUniform {
     pub fn new() -> Self {
         Self {
             view_proj: glam::Mat4::IDENTITY.to_cols_array_2d(),
+            camera_pos: [0f32; 3],
+            _padding: 0.0,
         }
     }
 
@@ -348,6 +368,7 @@ impl CameraUniform {
     pub fn update_view_proj(&mut self, camera: &Camera, projection: &Projection, scene: &Scene) {
         self.view_proj = (projection.cam_to_clip_matrix() * camera.world_to_cam_matrix(scene))
             .to_cols_array_2d();
+        self.camera_pos = camera.position(scene).to_array();
     }
 }
 
@@ -400,7 +421,7 @@ impl CameraRig {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
