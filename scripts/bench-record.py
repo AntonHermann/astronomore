@@ -10,6 +10,7 @@ Usage:
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 PERF_COLS = [
@@ -92,13 +93,13 @@ def main():
 
     entries = []
     with open(ndjson_path) as f:
-        for line in f:
+        for lineno, line in enumerate(f, start=1):
             line = line.strip()
             if line:
                 try:
                     entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
+                except json.JSONDecodeError as e:
+                    print(f"[perf] Warning: skipping malformed line {lineno} in {ndjson_path}: {e}", file=sys.stderr)
 
     Path(args.markdown).write_text(render_markdown(entries))
     print(f"[perf] {len(entries)} entries in history")

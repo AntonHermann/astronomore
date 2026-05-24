@@ -14,13 +14,7 @@
 //!   or a headless swapchain alternative (render to texture + readback).
 //!   Neither needs a window — both are doable with the existing headless device.
 
-use astronomore::{
-    celestial_body::CelestialBody,
-    mesh::Mesh,
-    scene::Scene,
-    shader_loader::validate_wgsl,
-    texture::Texture,
-};
+use astronomore::{CelestialBody, Mesh, Scene, Texture, validate_wgsl};
 use image::{DynamicImage, Rgba, RgbaImage};
 use web_time::Instant;
 
@@ -105,28 +99,7 @@ fn bench_sphere(device: &wgpu::Device) -> u64 {
 }
 
 fn bench_scene_update(device: &wgpu::Device, queue: &wgpu::Queue) -> u64 {
-    // Replicate the group 0 texture bind group layout from lib.rs
-    let texture_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("bench_texture_bgl"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                count: None,
-            },
-        ],
-    });
+    let texture_bgl = Texture::bind_group_layout(device);
 
     let mut scene = Scene::new(device);
 
