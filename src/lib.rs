@@ -265,42 +265,72 @@ impl State {
                 timestamp_writes: None,
                 multiview_mask: None,
             });
+            let _span = tracing::debug_span!("render pass");
+            let _guard = _span.enter();
 
             let pipeline = if self.view.wireframe {
                 &self.pipelines.wireframe
             } else {
                 &self.pipelines.fill
             };
+            tracing::trace!(
+                mode = if self.view.wireframe {
+                    "wireframe"
+                } else {
+                    "fill"
+                },
+                "set pipeline"
+            );
             render_pass.set_pipeline(pipeline);
+            tracing::trace!(group = 0, "set bind group: diffuse texture");
             render_pass.set_bind_group(0, &self.diffuse_texture.bind_group, &[]);
+            tracing::trace!(group = 1, "set bind group: camera");
             render_pass.set_bind_group(1, &self.camera_rig.bind_group, &[]);
+            tracing::trace!(group = 2, "set bind group: identity model");
             render_pass.set_bind_group(2, &self.identity_model_bind_group, &[]);
 
+            tracing::trace!(count = self.meshes.len(), "draw meshes");
             for mesh in &self.meshes {
                 render_pass.draw_mesh(mesh);
             }
 
             // TODO: move this logic into the scene and/or celestial body
+            tracing::trace!(
+                count = self.scene.celestial_bodies.len(),
+                "draw celestial bodies"
+            );
             for planet in &self.scene.celestial_bodies {
+                tracing::trace!(name = planet.name, "draw body");
                 render_pass.draw_celestial_body(planet, &self.camera_rig.bind_group);
             }
 
             if self.view.show_normals {
+                tracing::trace!("set pipeline: normals");
                 render_pass.set_pipeline(&self.pipelines.normals);
+                tracing::trace!(
+                    count = self.scene.celestial_bodies.len(),
+                    "draw body normals"
+                );
                 for planet in &self.scene.celestial_bodies {
+                    tracing::trace!(name = planet.name, "draw normals");
                     render_pass.draw_body_normals(planet, &self.camera_rig.bind_group);
                 }
             }
 
+            tracing::trace!("set pipeline: grid");
             render_pass.set_pipeline(&self.pipelines.grid);
+            tracing::trace!(group = 0, "set bind group: camera (grid)");
             render_pass.set_bind_group(0, &self.camera_rig.bind_group, &[]);
             if self.view.show_grid_xz {
+                tracing::trace!("draw grid: XZ");
                 render_pass.draw_grid(&self.grid_xz);
             }
             if self.view.show_grid_xy {
+                tracing::trace!("draw grid: XY");
                 render_pass.draw_grid(&self.grid_xy);
             }
             if self.view.show_grid_yz {
+                tracing::trace!("draw grid: YZ");
                 render_pass.draw_grid(&self.grid_yz);
             }
         }
