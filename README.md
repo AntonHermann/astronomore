@@ -52,6 +52,7 @@ Requires Rust (edition 2024). For WASM: `wasm-pack` and Python 3.
 | PageUp / PageDown | Time speed ×2 / ÷2 |
 | 0 | Reset time speed |
 | Tab | Wireframe mode (native only) |
+| N | Toggle normals overlay |
 | G | Toggle all grid planes |
 | Escape | Quit |
 
