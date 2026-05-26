@@ -173,7 +173,7 @@ just san        # cargo fmt + clippy -D warnings
 
 ## Architektur-Leitlinien
 
-- **Kamera:** `Camera`-Enum mit `Fps` und `Orbit(BodyId)` – Laufzeit-Umschaltung ohne Controller-Umbau
+- **Kamera:** `Camera`-Enum mit `Fps` und `Orbit(OrbitCamera)`; `OrbitCamera` enthält das Ziel über `target: BodyId` – Laufzeit-Umschaltung ohne Controller-Umbau
 - **Szenen-Datenstruktur:** `BodyId`-Newtype schützt vor falscher Indizierung; Eltern müssen immer vor Kindern in `celestial_bodies` stehen (debug_assert prüft das)
 - **Simulationszeit:** Immer `sim_time: f64` aus `SimState` verwenden, niemals `std::time::Instant` direkt in Orbitlogik – ermöglicht Pause und Zeitraffer ohne Refactoring
 - **Shader-Fehler:** Neue Shader immer über `shader_loader::validate_wgsl` laufen lassen, bevor `create_shader_module` aufgerufen wird – liefert source-span-genaue miette-Fehler statt wgpu-Panic
