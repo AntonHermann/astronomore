@@ -106,14 +106,31 @@ fn bench_scene_update(device: &wgpu::Device, queue: &wgpu::Queue) -> u64 {
     let body1 = {
         let layout = &scene.model_bind_group_layout;
         let tex = make_dummy_texture(device, queue, &texture_bgl);
-        CelestialBody::new(device, "root", 0.0, 1.0, 0.0, tex, layout)
+        CelestialBody::new(
+            device,
+            "root",
+            1.0,
+            astronomore::OrbitalModel::Fixed,
+            tex,
+            layout,
+        )
     };
     let root_id = scene.add_celestial_body(body1, None);
 
     let body2 = {
         let layout = &scene.model_bind_group_layout;
         let tex = make_dummy_texture(device, queue, &texture_bgl);
-        CelestialBody::new(device, "child", 10.0, 0.5, 1.0, tex, layout)
+        CelestialBody::new(
+            device,
+            "child",
+            0.5,
+            astronomore::OrbitalModel::Parametric {
+                radius: 10.0,
+                angular_velocity: 1.0,
+            },
+            tex,
+            layout,
+        )
     };
     scene.add_celestial_body(body2, Some(root_id));
 
