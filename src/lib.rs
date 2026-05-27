@@ -414,7 +414,7 @@ impl State {
             .show(&self.ui.ctx, |ui| {
                 ui.label(format!("FPS: {:.0}", fps));
                 let (y, m, d) = orbital::jde_to_gregorian(orbital::sim_time_to_jde(sim.time));
-                ui.label(format!("Datum: {:04}-{:02}-{:02}", y, m, d));
+                ui.label(format!("Date: {:04}-{:02}-{:02}", y, m, d));
                 ui.separator();
                 ui.label(format!(
                     "Time factor: {}x",
