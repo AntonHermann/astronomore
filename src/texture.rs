@@ -13,6 +13,34 @@ pub struct Texture {
 }
 
 impl Texture {
+    /// Returns the bind group layout for a 2D filterable texture + sampler (group 0, bindings 0-1).
+    ///
+    /// Both the main pipeline and the headless benchmark use this layout; it is the
+    /// single source of truth so they cannot drift apart.
+    pub fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("texture_bind_group_layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        })
+    }
+
     /// Load texture from path. The path is also used as label.
     #[tracing::instrument(err, skip(device, queue, bind_group_layout))]
     pub async fn load_from_path(

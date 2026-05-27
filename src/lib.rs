@@ -12,6 +12,12 @@ mod sim;
 mod texture;
 mod ui;
 
+pub use celestial_body::CelestialBody;
+pub use mesh::Mesh;
+pub use scene::{BodyId, Scene};
+pub use shader_loader::validate_wgsl;
+pub use texture::Texture;
+
 use std::sync::Arc;
 
 use miette::IntoDiagnostic;
@@ -33,7 +39,7 @@ use crate::grid::{DrawGrid, GridMesh};
 use crate::mesh::DrawMesh;
 use crate::{
     camera::{Camera, CameraRig},
-    celestial_body::{CelestialBody, DrawCelestialBody, DrawCelestialBodyNormals},
+    celestial_body::{DrawCelestialBody, DrawCelestialBodyNormals},
     gpu::GpuContext,
     pipelines::Pipelines,
 };
@@ -66,30 +72,7 @@ impl State {
         let surface_format = config.format;
         let size = winit::dpi::PhysicalSize::new(config.width, config.height);
 
-        let texture_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        // This should match the filterable field of the
-                        // corresponding Texture entry above.
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: None,
-                    },
-                ],
-                label: Some("texture_bind_group_layout"),
-            });
+        let texture_bind_group_layout = texture::Texture::bind_group_layout(device);
         let diffuse_bytes = loader::load_bytes("assets/textures/dbg.png").await?;
         let diffuse_texture = texture::Texture::from_bytes(
             device,

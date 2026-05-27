@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Pre-commit performance benchmark hook.
+# Skip with: SKIP_BENCH=1 git commit
+set -euo pipefail
+
+if [ "${SKIP_BENCH:-0}" = "1" ]; then
+    echo "[perf] Skipped (SKIP_BENCH=1)"
+    exit 0
+fi
+
+echo "[perf] Building benchmark (release)…"
+# python3 is already required for bench-record.py; use it here for portable ms timing
+t0=$(python3 -c 'import time; print(int(time.time()*1000))')
+cargo build --release --bin bench --quiet
+t1=$(python3 -c 'import time; print(int(time.time()*1000))')
+build_ms=$(( t1 - t0 ))
+
+# Warn (don't fail) if there are unstaged changes to source files: cargo
+# compiles the full working tree, so the binary may not match staged content.
+if ! git diff --quiet -- ':(exclude)perf/'; then
+    echo "[perf] Warning: unstaged source changes present; benchmark reflects working tree, not just staged content"
+fi
+
+echo "[perf] Running…"
+tmpfile=$(mktemp)
+trap 'rm -f "$tmpfile"' EXIT
+./target/release/bench > "$tmpfile"
+
+# Tree hash of the staged source tree, computed before bench-record.py updates
+# perf/. This is intentional: the tree identifies the code being benchmarked;
+# including the measurement files would make the hash self-referential.
+tree=$(git write-tree)
+branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "detached")
+date_str=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+python3 scripts/bench-record.py "$tmpfile" \
+    --tree="$tree" \
+    --branch="$branch" \
+    --date="$date_str" \
+    --build-ms="$build_ms" \
+    --ndjson=perf/benchmarks.ndjson \
+    --markdown=perf/benchmarks.md
+
+git add perf/benchmarks.ndjson perf/benchmarks.md
+echo "[perf] Recorded — build: ${build_ms}ms"
