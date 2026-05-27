@@ -361,7 +361,12 @@ impl State {
         let mut reset_camera = false;
         let cam_pos = match &self.camera_rig.camera {
             Camera::Fps(camera) => camera.position,
-            Camera::Orbit(camera) => camera.target_and_camera_pos(&self.scene).1,
+            Camera::Orbit(camera) => camera.position(
+                self.camera_rig
+                    .camera
+                    .orbit_target(&self.scene)
+                    .expect("orbit camera has target"),
+            ),
         };
         let cam_is_fps = matches!(&self.camera_rig.camera, Camera::Fps(_));
         let body_list: Vec<(scene::BodyId, String)> = self
@@ -713,7 +718,10 @@ impl State {
             let screen_w = self.gpu.config.width as f32;
             let screen_h = self.gpu.config.height as f32;
             let view_proj = self.camera_rig.projection.cam_to_clip_matrix()
-                * self.camera_rig.camera.world_to_cam_matrix(&self.scene);
+                * self
+                    .camera_rig
+                    .camera
+                    .world_to_cam_matrix(self.camera_rig.camera.orbit_target(&self.scene));
 
             for (body_id, name) in &body_list {
                 let world_pos = self

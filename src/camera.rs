@@ -5,7 +5,7 @@ use winit::dpi::PhysicalPosition;
 use winit::event::*;
 use winit::keyboard::KeyCode;
 
-use crate::scene::{self, BodyId, Scene};
+use crate::scene::{BodyId, Scene};
 
 #[rustfmt::skip]
 const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols(
@@ -32,18 +32,36 @@ impl Camera {
     }
 
     /// Calculate the view matrix for this camera. This is the transform that transforms world space to camera space.
-    pub fn world_to_cam_matrix(&self, scene: &Scene) -> glam::Mat4 {
+    /// For `Orbit` cameras, `orbit_target` must be `Some(world_pos_of_target_body)`.
+    pub fn world_to_cam_matrix(&self, orbit_target: Option<glam::Vec3>) -> glam::Mat4 {
         match self {
             Camera::Fps(camera) => camera.world_to_cam_matrix(),
-            Camera::Orbit(camera) => camera.world_to_cam_matrix(scene),
+            Camera::Orbit(camera) => camera.world_to_cam_matrix(
+                orbit_target.expect("orbit_target required for Camera::Orbit"),
+            ),
         }
     }
 
     /// Returns the position of the camera in world space.
-    pub fn position(&self, scene: &Scene) -> glam::Vec3 {
+    pub fn position(&self, orbit_target: Option<glam::Vec3>) -> glam::Vec3 {
         match self {
             Camera::Fps(cam) => cam.position,
-            Camera::Orbit(cam) => cam.position(scene),
+            Camera::Orbit(cam) => {
+                cam.position(orbit_target.expect("orbit_target required for Camera::Orbit"))
+            }
+        }
+    }
+
+    /// Returns the world-space position of this camera's orbit target,
+    /// or `None` if this is not an orbit camera.
+    pub fn orbit_target(&self, scene: &Scene) -> Option<glam::Vec3> {
+        match self {
+            Camera::Orbit(c) => Some(
+                scene
+                    .get_body_orbital_transform(c.target)
+                    .transform_point3(glam::Vec3::ZERO),
+            ),
+            _ => None,
         }
     }
 }
@@ -107,24 +125,14 @@ impl OrbitCamera {
     }
 
     /// Returns the position of the camera in world space.
-    pub fn position(&self, scene: &Scene) -> glam::Vec3 {
-        let (_target_pos, camera_pos) = self.target_and_camera_pos(scene);
-        camera_pos
-    }
-
-    pub fn target_and_camera_pos(&self, scene: &Scene) -> (glam::Vec3, glam::Vec3) {
-        let target_pos = scene
-            .get_body_orbital_transform(self.target)
-            .transform_point3(glam::Vec3::ZERO);
+    pub fn position(&self, target_pos: glam::Vec3) -> glam::Vec3 {
         let rel_camera_transform = self.relative_camera_transform();
-        let camera_pos = rel_camera_transform.transform_point3(target_pos);
-        (target_pos, camera_pos)
+        rel_camera_transform.transform_point3(target_pos)
     }
 
     /// Calculate the view matrix for this camera. This is the transform that transforms world space to camera space.
-    pub fn world_to_cam_matrix(&self, scene: &Scene) -> glam::Mat4 {
-        let (target_pos, camera_pos) = self.target_and_camera_pos(scene);
-
+    pub fn world_to_cam_matrix(&self, target_pos: glam::Vec3) -> glam::Mat4 {
+        let camera_pos = self.position(target_pos);
         glam::Mat4::look_at_rh(camera_pos, target_pos, glam::Vec3::Y)
     }
 }
@@ -267,7 +275,7 @@ impl CameraController {
         };
     }
 
-    pub fn update_camera(&mut self, camera: &mut Camera, dt: Duration, _scene: &scene::Scene) {
+    pub fn update_camera(&mut self, camera: &mut Camera, dt: Duration) {
         let dt = dt.as_secs_f32();
 
         let forward_amt = self.amount_forward.max(self.touch.forward);
@@ -366,9 +374,18 @@ impl CameraUniform {
 
     /// Recompute `view_proj` from the current camera + projection + scene state.
     pub fn update_view_proj(&mut self, camera: &Camera, projection: &Projection, scene: &Scene) {
-        self.view_proj = (projection.cam_to_clip_matrix() * camera.world_to_cam_matrix(scene))
-            .to_cols_array_2d();
-        self.camera_pos = camera.position(scene).to_array();
+        let orbit_target = match camera {
+            Camera::Orbit(c) => Some(
+                scene
+                    .get_body_orbital_transform(c.target)
+                    .transform_point3(glam::Vec3::ZERO),
+            ),
+            _ => None,
+        };
+        self.view_proj = (projection.cam_to_clip_matrix()
+            * camera.world_to_cam_matrix(orbit_target))
+        .to_cols_array_2d();
+        self.camera_pos = camera.position(orbit_target).to_array();
     }
 }
 
@@ -460,7 +477,7 @@ impl CameraRig {
 
     /// Step the controller, recompute the view-projection uniform, and upload it.
     pub fn update(&mut self, dt: Duration, scene: &Scene, queue: &wgpu::Queue) {
-        self.controller.update_camera(&mut self.camera, dt, scene);
+        self.controller.update_camera(&mut self.camera, dt);
         self.uniform
             .update_view_proj(&self.camera, &self.projection, scene);
         queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&[self.uniform]));
