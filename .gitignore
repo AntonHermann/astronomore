@@ -3,3 +3,5 @@
 /assets/textures
 scripts/__marimo__/
 # perf/
+perf/bench-report.*
+perf/plots/
