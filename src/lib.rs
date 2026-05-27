@@ -416,13 +416,18 @@ impl State {
                 let (y, m, d) = orbital::jde_to_gregorian(orbital::sim_time_to_jde(sim.time));
                 ui.label(format!("Date: {:04}-{:02}-{:02}", y, m, d));
                 ui.separator();
-                ui.label(format!(
-                    "Time factor: {}x",
-                    if sim.multiplier.fract() == 0.0 {
-                        format!("{}", sim.multiplier as i32)
+
+                fn fmt_float(v: f64) -> String {
+                    if v.fract() == 0.0 {
+                        format!("{}", v as i64)
                     } else {
-                        format!("{:.2}", sim.multiplier)
+                        format!("{:.2}", v)
                     }
+                }
+                ui.label(format!(
+                    "Time factor: {}x ({} days / s)",
+                    fmt_float(sim.multiplier),
+                    fmt_float(sim.sim_days_per_clock_sec()),
                 ));
                 ui.horizontal(|ui| {
                     if ui.button("◀◀").on_hover_text("Halve (PageDown)").clicked() {
@@ -437,6 +442,13 @@ impl State {
                     }
                     if ui.button("1×").on_hover_text("Reset (0)").clicked() {
                         sim.reset_speed();
+                    }
+                    if ui
+                        .button("1 d/s")
+                        .on_hover_text("1 sim day per second")
+                        .clicked()
+                    {
+                        sim.set_sim_days_per_sec(1.);
                     }
                 });
                 ui.separator();

@@ -7,6 +7,9 @@ pub const AU_TO_SCENE: f64 = 10.0;
 /// Julian Day of the J2000.0 epoch (2000-01-01 12:00 TT).
 const J2000_JDE: f64 = 2_451_545.0;
 
+/// Seconds in one day (24 h × 60 min × 60 s).
+pub(crate) const SEC_PER_DAY: f64 = 24.0 * 60.0 * 60.0;
+
 /// Identifies which VSOP87A planetary solution to use for position computation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Vsop87Body {
@@ -34,7 +37,7 @@ pub enum OrbitalModel {
 
 /// Converts simulation time (seconds since J2000.0) to a Julian Ephemeris Date.
 pub fn sim_time_to_jde(sim_time_s: f64) -> f64 {
-    J2000_JDE + sim_time_s / 86_400.0
+    J2000_JDE + sim_time_s / SEC_PER_DAY
 }
 
 /// Converts a Julian Day to a proleptic Gregorian date `(year, month, day)`.

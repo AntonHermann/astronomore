@@ -39,19 +39,42 @@ impl SimState {
     /// Double the time multiplier.
     pub fn double_speed(&mut self) {
         self.multiplier *= 2.0;
-        tracing::info!("Sim time mult: {}x", self.multiplier);
+        tracing::info!(
+            "Sim time mult: {}x ({} days/s)",
+            self.multiplier,
+            self.sim_days_per_clock_sec()
+        );
     }
 
     /// Halve the time multiplier.
     pub fn halve_speed(&mut self) {
         self.multiplier /= 2.0;
-        tracing::info!("Sim time mult: {}x", self.multiplier);
+        tracing::info!(
+            "Sim time mult: {}x ({} days/s)",
+            self.multiplier,
+            self.sim_days_per_clock_sec()
+        );
     }
 
     /// Reset the multiplier to 1x (realtime).
     pub fn reset_speed(&mut self) {
         self.multiplier = 1.0;
         tracing::info!("Sim time mult reset: {}x", self.multiplier);
+    }
+
+    /// Returns how many simulation days pass for every second in real/wall-clock time.
+    pub const fn sim_days_per_clock_sec(&self) -> f64 {
+        self.multiplier / crate::orbital::SEC_PER_DAY
+    }
+
+    /// Set sim time so that for every wall clock second, the sim time advances by `days`.
+    pub fn set_sim_days_per_sec(&mut self, days: f64) {
+        self.multiplier = crate::orbital::SEC_PER_DAY * days;
+        tracing::info!(
+            "Sim time mult: {}x ({} days/s)",
+            self.multiplier,
+            self.sim_days_per_clock_sec()
+        );
     }
 }
 
