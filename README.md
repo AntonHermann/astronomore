@@ -12,7 +12,8 @@ All 8 planets + Moon orbit the Sun using VSOP87 astronomical ephemerides. Blinn-
 - **NASA textures** – 2 k texture maps for every body
 - **Two camera modes** – FPS (free-flight) and Orbit (tracks any body)
 - **Mobile-friendly** – on-screen touch navigation buttons; tested on Android via WebGL
-- **Real-time controls** – pause, ×2/÷2 speed, date display, tessellation sliders, lighting parameter tuning
+- **Time control panel** – dedicated window (bottom-right) with date display, pause, ×2/÷2 speed, and a date-jump input to jump to any date instantly (live preview while dragging)
+- **Lighting & tessellation controls** – egui sliders for Blinn-Phong parameters and sphere meridian/parallel count
 - **Wireframe & normal overlays** – toggleable debug views (wireframe native-only)
 - **Cross-platform** – native (Linux / macOS / Windows) + WASM/WebGL via wasm-pack
 - **Shader hot-reload** – native build watches `src/shaders/` and reloads on save
