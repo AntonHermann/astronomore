@@ -420,38 +420,40 @@ impl State {
             .resizable(false)
             .anchor(egui::Align2::RIGHT_TOP, egui::Vec2::new(-8.0, 8.0))
             .show(&self.ui.ctx, |ui| {
-                let wireframe_label = if view.wireframe {
-                    "Wireframe: on"
-                } else {
-                    "Wireframe: off"
-                };
-                if ui
-                    .button(wireframe_label)
-                    .on_hover_text("Toggle (Tab)")
-                    .clicked()
-                {
-                    view.toggle_wireframe();
-                }
-                let normals_label = if view.show_normals {
-                    "Normals: on"
-                } else {
-                    "Normals: off"
-                };
-                if ui
-                    .button(normals_label)
-                    .on_hover_text("Toggle (N)")
-                    .clicked()
-                {
-                    view.toggle_normals();
-                }
-                let names_label = if view.show_body_names {
-                    "Labels: on"
-                } else {
-                    "Labels: off"
-                };
-                if ui.button(names_label).on_hover_text("Toggle (L)").clicked() {
-                    view.toggle_body_names();
-                }
+                ui.horizontal(|ui| {
+                    let wireframe_label = if view.wireframe {
+                        "Wireframe: on"
+                    } else {
+                        "Wireframe: off"
+                    };
+                    if ui
+                        .button(wireframe_label)
+                        .on_hover_text("Toggle (Tab)")
+                        .clicked()
+                    {
+                        view.toggle_wireframe();
+                    }
+                    let normals_label = if view.show_normals {
+                        "Normals: on"
+                    } else {
+                        "Normals: off"
+                    };
+                    if ui
+                        .button(normals_label)
+                        .on_hover_text("Toggle (N)")
+                        .clicked()
+                    {
+                        view.toggle_normals();
+                    }
+                    let names_label = if view.show_body_names {
+                        "Labels: on"
+                    } else {
+                        "Labels: off"
+                    };
+                    if ui.button(names_label).on_hover_text("Toggle (L)").clicked() {
+                        view.toggle_body_names();
+                    }
+                });
                 ui.separator();
                 egui::CollapsingHeader::new("Grid")
                     .default_open(false)
@@ -539,6 +541,7 @@ impl State {
                                     ui.end_row();
                                 }
                                 ui.separator();
+                                ui.end_row();
                                 ui.label("Meridians:");
                                 ui.add(egui::Slider::new(&mut view.sphere_meridians, 3..=128));
                                 ui.end_row();
