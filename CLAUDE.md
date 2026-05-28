@@ -39,15 +39,15 @@
 - `Scene` mit `Vec<CelestialBody>` und `BodyId`-Newtype; Eltern müssen vor Kindern eingefügt werden
 - Orbitale Hierarchie: Transforms werden per topologisch-sortierter Iteration kumuliert
 - `planets.rs`: deklaratives 10-Körper-Array (`BodyDef`) – Sonne, alle 8 Planeten, Mond
-- `orbital.rs`: VSOP87-Anbindung, `sim_time_to_jde()`, `jde_to_gregorian()` (Meeus-Algorithmus)
+- `orbital.rs`: VSOP87-Anbindung, `sim_time_to_jde()`, `jde_to_gregorian()`, `gregorian_to_jde()`, `jde_to_sim_time()` (Meeus-Algorithmus, bidirektional)
 - Blinn-Phong-Beleuchtung im Fragment-Shader: ambient + diffus + spekular; Sonne als Punktlicht
 - `ScenePropertiesUniform` (group 3): Laufzeit-Beleuchtungsparameter per egui-Regler einstellbar
 - Normalenvisualisierung: eigene Pipeline + Shader (`normals.wgsl`), toggle per UI
-- `sim_time: f64` in `SimState` (`sim.rs`), pausierbar (P), Geschwindigkeitsfaktor (PageUp/Down/0), Datumsanzeige
+- `sim_time: f64` in `SimState` (`sim.rs`), pausierbar (P), Geschwindigkeitsfaktor (PageUp/Down/0), `jump_to_date()` für direkten Zeitsprung
 - Wireframe-Modus (Tab), eigene Pipeline mit `PolygonMode::Line` (nur nativ)
 - Koordinatengitter für XZ/XY/YZ-Ebenen (`src/grid.rs`), eigene Pipeline + Shader, toggle via G-Taste
 - Render-Pipelines in `pipelines.rs` ausgelagert (fill, wireframe, normals, grid)
-- egui-Overlay: FPS, Zeitsteuerung, Datumsanzeige, Beleuchtungs-Regler, Tesselierungs-Regler, Kamerasteuerung, Grid-Checkboxen
+- egui-UI: separates „Time Control"-Fenster (unten rechts) mit Datumsanzeige, Zeitfaktor, Steuerbuttons, Datumseingabe (DragValue, Live-Vorschau); FPS-Overlay (rahmenlos, oben links); „Simulation"-Fenster (oben rechts) für Beleuchtungs-Regler, Tesselierungs-Regler, Kamerasteuerung, Grid-Checkboxen
 - Shader-Validierung via naga mit source-span-genauen miette-Fehlermeldungen (`src/shader_loader.rs`)
 - Shader-Hot-Reload nativ (notify-debouncer-mini, Datei-Watcher auf `src/shaders/`)
 - WASM-Pfad: WebGL-Backend, `wasm-bindgen`, Canvas-Integration via `index.html`
@@ -62,9 +62,9 @@ src/
   camera.rs           – Camera-Enum (Fps/Orbit), FpsCamera, OrbitCamera, Projection, Controller
   celestial_body.rs   – CelestialBody, OrbitalParameters, ModelUniform, DrawCelestialBody-Trait
   scene.rs            – Scene, BodyId, hierarchische Transform-Berechnung
-  orbital.rs          – OrbitalModel (Fixed/Parametric/Vsop87), sim_time_to_jde, jde_to_gregorian
+  orbital.rs          – OrbitalModel (Fixed/Parametric/Vsop87), sim_time_to_jde, jde_to_gregorian, gregorian_to_jde, jde_to_sim_time
   planets.rs          – SolarSystemBody-Enum, BodyDef, 10-Körper-Array (Sonne + Planeten + Mond)
-  sim.rs              – SimState (time: f64, multiplier, is_paused)
+  sim.rs              – SimState (time: f64, multiplier, is_paused), jump_to_date
   scene_properties.rs – ScenePropertiesUniform (Blinn-Phong-Parameter, Lichtposition/-farbe)
   ui.rs               – ViewOptions, EguiLayer
   gpu.rs              – GpuContext (Surface, Device, Queue, Adapter)
@@ -142,7 +142,7 @@ just san        # cargo fmt + clippy -D warnings
 - [x] **Planetenpositionen via VSOP87** (Crate `vsop87`) – Merkur bis Neptun auf echten Ephemeridenbahnen
 - [x] Simulationszeit → Julianisches Datum → Gregorianisches Datum (Meeus-Algorithmus)
 - [x] Zeitraffer steuerbar (Faktor, Pause)
-- [ ] Datum/Uhrzeit als direkter Eingabe-Parameter (Sprung zu einem bestimmten Zeitpunkt)
+- [x] Datum/Uhrzeit als direkter Eingabe-Parameter (Sprung zu einem bestimmten Zeitpunkt)
 - [ ] Sternenhintergrund aus HYG-Datenbank (~120.000 Sterne als Punktwolke, Farbe aus Spektralklasse)
 - [ ] Logarithmische oder benutzerdefinierte Skalierungsstrategie für echte Abstände
 
@@ -157,9 +157,8 @@ just san        # cargo fmt + clippy -D warnings
 ## Mögliche nächste Schritte
 
 ### Hoher Mehrwert, überschaubar
-1. **Datum-Eingabe im UI** – Textfeld oder Datumspicker, der `sim_time` direkt auf ein JDE setzt; ermöglicht "Zeig mir die Planetenkonstellationen am 21.12.2012"
-2. **Sternenhintergrund** – HYG-Katalog als CSV einlesen, ~120 k Punkte als Punktwolke rendern (eigene Pipeline, `gl_PointSize` via WGSL `point-size`-Feature oder Billboard-Quads); Farbe aus Spektralklasse (B–V-Index → RGB)
-3. **Saturnringe** – flaches Ringmesh (Annulus-Geometrie), eigene Textur (`2k_saturn_ring_alpha.png` NASA), Alpha-Blending
+1. **Sternenhintergrund** – HYG-Katalog als CSV einlesen, ~120 k Punkte als Punktwolke rendern (eigene Pipeline, `gl_PointSize` via WGSL `point-size`-Feature oder Billboard-Quads); Farbe aus Spektralklasse (B–V-Index → RGB)
+2. **Saturnringe** – flaches Ringmesh (Annulus-Geometrie), eigene Textur (`2k_saturn_ring_alpha.png` NASA), Alpha-Blending
 
 ### Mittlere Komplexität
 4. **Atmosphären-Halo** – screen-space Overlay oder billboardierter Halo-Ring um Erde/Venus; keine echte Volumetrik nötig
