@@ -411,7 +411,10 @@ impl State {
         egui::Area::new(egui::Id::new("fps_overlay"))
             .anchor(egui::Align2::LEFT_TOP, egui::Vec2::new(8.0, 8.0))
             .show(&self.ui.ctx, |ui| {
-                ui.label(format!("FPS: {:.0}", fps));
+                ui.set_min_width(80.0);
+                ui.label(
+                    egui::RichText::new(format!("FPS: {:.0}", fps)).color(egui::Color32::BLACK),
+                );
             });
         egui::Window::new("Simulation")
             .resizable(false)
