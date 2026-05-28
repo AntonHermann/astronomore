@@ -19,6 +19,12 @@ pub struct ViewOptions {
     pub sphere_parallels: u32,
     /// Show name labels for each celestial body as a screen-space overlay.
     pub show_body_names: bool,
+    /// Year field in the "Jump to date" input (Gregorian).
+    pub date_input_year: i32,
+    /// Month field in the "Jump to date" input (1–12).
+    pub date_input_month: u8,
+    /// Day field in the "Jump to date" input (1–31).
+    pub date_input_day: u8,
 }
 
 impl ViewOptions {
@@ -33,6 +39,9 @@ impl ViewOptions {
             sphere_meridians: 128,
             sphere_parallels: 64,
             show_body_names: false,
+            date_input_year: 2000,
+            date_input_month: 1,
+            date_input_day: 1,
         }
     }
 

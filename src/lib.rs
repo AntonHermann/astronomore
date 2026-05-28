@@ -408,50 +408,15 @@ impl State {
 
         let raw_input = self.ui.state.take_egui_input(&self.gpu.window);
         self.ui.ctx.begin_pass(raw_input);
+        egui::Area::new(egui::Id::new("fps_overlay"))
+            .anchor(egui::Align2::LEFT_TOP, egui::Vec2::new(8.0, 8.0))
+            .show(&self.ui.ctx, |ui| {
+                ui.label(format!("FPS: {:.0}", fps));
+            });
         egui::Window::new("Simulation")
             .resizable(false)
             .anchor(egui::Align2::RIGHT_TOP, egui::Vec2::new(-8.0, 8.0))
             .show(&self.ui.ctx, |ui| {
-                ui.label(format!("FPS: {:.0}", fps));
-                let (y, m, d) = orbital::jde_to_gregorian(orbital::sim_time_to_jde(sim.time));
-                ui.label(format!("Date: {:04}-{:02}-{:02}", y, m, d));
-                ui.separator();
-
-                fn fmt_float(v: f64) -> String {
-                    if v.fract() == 0.0 {
-                        format!("{}", v as i64)
-                    } else {
-                        format!("{:.2}", v)
-                    }
-                }
-                ui.label(format!(
-                    "Time factor: {}x ({} days / s)",
-                    fmt_float(sim.multiplier),
-                    fmt_float(sim.sim_days_per_clock_sec()),
-                ));
-                ui.horizontal(|ui| {
-                    if ui.button("◀◀").on_hover_text("Halve (PageDown)").clicked() {
-                        sim.halve_speed();
-                    }
-                    let pause_label = if sim.is_paused { "▶" } else { "⏸" };
-                    if ui.button(pause_label).on_hover_text("Pause (P)").clicked() {
-                        sim.toggle_pause();
-                    }
-                    if ui.button("▶▶").on_hover_text("Double (PageUp)").clicked() {
-                        sim.double_speed();
-                    }
-                    if ui.button("1×").on_hover_text("Reset (0)").clicked() {
-                        sim.reset_speed();
-                    }
-                    if ui
-                        .button("1 d/s")
-                        .on_hover_text("1 sim day per second")
-                        .clicked()
-                    {
-                        sim.set_sim_days_per_sec(1.);
-                    }
-                });
-                ui.separator();
                 let wireframe_label = if view.wireframe {
                     "Wireframe: on"
                 } else {
@@ -680,6 +645,87 @@ impl State {
                             reset_camera = true;
                         }
                     });
+            });
+        egui::Window::new("Time Control")
+            .resizable(false)
+            .anchor(egui::Align2::RIGHT_BOTTOM, egui::Vec2::new(-8.0, -8.0))
+            .show(&self.ui.ctx, |ui| {
+                let (y, m, d) = orbital::jde_to_gregorian(orbital::sim_time_to_jde(sim.time));
+                ui.label(format!("Date: {:04}-{:02}-{:02}", y, m, d));
+
+                fn fmt_float(v: f64) -> String {
+                    if v.fract() == 0.0 {
+                        format!("{}", v as i64)
+                    } else {
+                        format!("{:.2}", v)
+                    }
+                }
+                ui.label(format!(
+                    "Time factor: {}x ({} days / s)",
+                    fmt_float(sim.multiplier),
+                    fmt_float(sim.sim_days_per_clock_sec()),
+                ));
+                ui.horizontal(|ui| {
+                    if ui.button("◀◀").on_hover_text("Halve (PageDown)").clicked() {
+                        sim.halve_speed();
+                    }
+                    let pause_label = if sim.is_paused { "▶" } else { "⏸" };
+                    if ui.button(pause_label).on_hover_text("Pause (P)").clicked() {
+                        sim.toggle_pause();
+                    }
+                    if ui.button("▶▶").on_hover_text("Double (PageUp)").clicked() {
+                        sim.double_speed();
+                    }
+                    if ui.button("1×").on_hover_text("Reset (0)").clicked() {
+                        sim.reset_speed();
+                    }
+                    if ui
+                        .button("1 d/s")
+                        .on_hover_text("1 sim day per second")
+                        .clicked()
+                    {
+                        sim.set_sim_days_per_sec(1.);
+                    }
+                });
+                ui.separator();
+                ui.label("Jump to date");
+                ui.horizontal(|ui| {
+                    let y_ch = ui
+                        .add(
+                            egui::DragValue::new(&mut view.date_input_year)
+                                .range(-4712..=9999)
+                                .prefix("Y "),
+                        )
+                        .changed();
+                    let m_ch = ui
+                        .add(
+                            egui::DragValue::new(&mut view.date_input_month)
+                                .range(1u8..=12u8)
+                                .prefix("M "),
+                        )
+                        .changed();
+                    let d_ch = ui
+                        .add(
+                            egui::DragValue::new(&mut view.date_input_day)
+                                .range(1u8..=31u8)
+                                .prefix("D "),
+                        )
+                        .changed();
+                    if y_ch || m_ch || d_ch {
+                        sim.jump_to_date(
+                            view.date_input_year,
+                            view.date_input_month,
+                            view.date_input_day,
+                        );
+                    }
+                    if ui.button("Jump →").clicked() {
+                        sim.jump_to_date(
+                            view.date_input_year,
+                            view.date_input_month,
+                            view.date_input_day,
+                        );
+                    }
+                });
             });
         let mut touch = camera::TouchInput::default();
         egui::Window::new("Navigation")

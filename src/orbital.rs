@@ -40,6 +40,26 @@ pub fn sim_time_to_jde(sim_time_s: f64) -> f64 {
     J2000_JDE + sim_time_s / SEC_PER_DAY
 }
 
+/// Converts a proleptic Gregorian date to a Julian Day at 0:00 UT of that date.
+///
+/// Algorithm from Meeus, *Astronomical Algorithms*, Chapter 7 (inverse of [`jde_to_gregorian`]).
+pub fn gregorian_to_jde(year: i32, month: u8, day: u8) -> f64 {
+    let (y, m) = if month <= 2 {
+        (year - 1, month as i32 + 12)
+    } else {
+        (year, month as i32)
+    };
+    let a = (y as f64 / 100.0).floor();
+    let b = 2.0 - a + (a / 4.0).floor();
+    (365.25 * (y as f64 + 4716.0)).floor() + (30.6001 * (m as f64 + 1.0)).floor() + day as f64 + b
+        - 1524.5
+}
+
+/// Converts a Julian Day back to simulation time (seconds since J2000.0).
+pub fn jde_to_sim_time(jde: f64) -> f64 {
+    (jde - J2000_JDE) * SEC_PER_DAY
+}
+
 /// Converts a Julian Day to a proleptic Gregorian date `(year, month, day)`.
 ///
 /// Algorithm from Meeus, *Astronomical Algorithms*, Chapter 7.
