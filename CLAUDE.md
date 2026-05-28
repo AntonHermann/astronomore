@@ -108,6 +108,8 @@ just san        # cargo fmt + clippy -D warnings
 | PageUp / PageDown | Zeit-Faktor ×2 / ÷2 |
 | 0 | Zeit-Faktor zurücksetzen |
 | Tab | Wireframe-Modus (nur nativ) |
+| N | Normalenvisualisierung umschalten |
+| L | Körper-Namen-Labels umschalten |
 | G | Alle Gitter umschalten |
 | Escape | Beenden |
 
