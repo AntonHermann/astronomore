@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astronomore</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { overscroll-behavior: none; }
+        body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; height: 100dvh; }
+        canvas { display: block; width: 100vw; height: 100vh; height: 100dvh; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script type="module">
+        import init from "./pkg/astronomore.js";
+        await init();
+    </script>
+</body>
+</html>
