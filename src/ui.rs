@@ -25,6 +25,14 @@ pub struct ViewOptions {
     pub date_input_month: u8,
     /// Day field in the "Jump to date" input (1–31).
     pub date_input_day: u8,
+    /// Master toggle: show debug vector arrows.
+    pub show_arrows: bool,
+    /// Show velocity-direction arrows (cyan).
+    pub arrows_velocity: bool,
+    /// Show radial arrows toward parent / sun (orange).
+    pub arrows_radial: bool,
+    /// Show spin-axis arrows (green).
+    pub arrows_spin: bool,
 }
 
 impl ViewOptions {
@@ -42,6 +50,10 @@ impl ViewOptions {
             date_input_year: 2000,
             date_input_month: 1,
             date_input_day: 1,
+            show_arrows: false,
+            arrows_velocity: true,
+            arrows_radial: true,
+            arrows_spin: true,
         }
     }
 
@@ -75,6 +87,12 @@ impl ViewOptions {
         self.show_grid_xy = target;
         self.show_grid_yz = target;
         tracing::info!("Grids: {}", self.any_grid_visible());
+    }
+
+    /// Flip the debug-arrows overlay flag.
+    pub fn toggle_arrows(&mut self) {
+        self.show_arrows = !self.show_arrows;
+        tracing::info!("Debug arrows: {}", self.show_arrows);
     }
 }
 

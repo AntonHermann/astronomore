@@ -54,6 +54,8 @@ pub struct CelestialBody {
     pub orbital_transform: Mat4,
     /// Transform in model space to apply spin (e.g. rotation around its own axis)
     pub spin_transform: Mat4,
+    /// World-space position of this body, updated each frame by `Scene::update`.
+    pub world_position: Vec3,
     /// Uniform containing the combined model transform (world * spin) and radius for this body, to be passed to the shader
     pub model_uniform: ModelUniform,
     pub model_buffer: wgpu::Buffer,
@@ -125,6 +127,7 @@ impl CelestialBody {
             orbital_parameters,
             orbital_transform: Mat4::IDENTITY,
             spin_transform: Mat4::IDENTITY,
+            world_position: Vec3::ZERO,
             model_uniform,
             model_buffer,
             model_bind_group,
