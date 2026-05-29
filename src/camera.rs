@@ -483,3 +483,163 @@ impl CameraRig {
         queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&[self.uniform]));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glam::Vec3;
+    use web_time::Duration;
+    use winit::event::ElementState;
+    use winit::keyboard::KeyCode;
+
+    const EPS: f32 = 1e-5;
+
+    fn approx_eq3(a: Vec3, b: Vec3) -> bool {
+        (a - b).length() < EPS
+    }
+
+    fn make_ctrl() -> CameraController {
+        CameraController::new(1.0, 1.0, 1.0)
+    }
+
+    /// Step an FPS camera through the public controller for one second.
+    fn step_fps(ctrl: &mut CameraController, cam: FpsCamera) -> FpsCamera {
+        let mut camera = Camera::Fps(cam);
+        ctrl.update_camera(&mut camera, Duration::from_secs(1));
+        match camera {
+            Camera::Fps(c) => c,
+            _ => unreachable!(),
+        }
+    }
+
+    // --- FpsCamera::world_to_cam_matrix ---
+
+    #[test]
+    fn view_matrix_eye_maps_to_origin() {
+        let cam = FpsCamera::new(Vec3::new(3.0, 4.0, 5.0), 0.0, 0.0);
+        let result = cam.world_to_cam_matrix().transform_point3(cam.position);
+        assert!(approx_eq3(result, Vec3::ZERO), "got {result}");
+    }
+
+    #[test]
+    fn view_matrix_look_direction_maps_to_neg_z() {
+        // yaw=0, pitch=0 → forward direction in world space is +X
+        let cam = FpsCamera::new(Vec3::ZERO, 0.0, 0.0);
+        let forward_cam = cam.world_to_cam_matrix().transform_vector3(Vec3::X);
+        assert!(approx_eq3(forward_cam, Vec3::NEG_Z), "got {forward_cam}");
+    }
+
+    #[test]
+    fn view_matrix_world_up_stays_up() {
+        let cam = FpsCamera::new(Vec3::ZERO, 0.0, 0.0);
+        let up_cam = cam.world_to_cam_matrix().transform_vector3(Vec3::Y);
+        assert!(approx_eq3(up_cam, Vec3::Y), "got {up_cam}");
+    }
+
+    // --- CameraController input → FPS camera movement ---
+
+    #[test]
+    fn space_moves_camera_up() {
+        let mut ctrl = make_ctrl();
+        ctrl.handle_key(KeyCode::Space, ElementState::Pressed);
+        let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
+        assert!(cam.position.y > 0.0, "expected y > 0, got {}", cam.position.y);
+    }
+
+    #[test]
+    fn shift_moves_camera_down() {
+        let mut ctrl = make_ctrl();
+        ctrl.handle_key(KeyCode::ShiftLeft, ElementState::Pressed);
+        let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
+        assert!(cam.position.y < 0.0, "expected y < 0, got {}", cam.position.y);
+    }
+
+    #[test]
+    fn key_release_stops_movement() {
+        let mut ctrl = make_ctrl();
+        ctrl.handle_key(KeyCode::Space, ElementState::Pressed);
+        ctrl.handle_key(KeyCode::Space, ElementState::Released);
+        let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
+        assert_eq!(cam.position, Vec3::ZERO);
+    }
+
+    #[test]
+    fn w_moves_forward_along_yaw() {
+        // yaw=0 → forward is +X in world space
+        let mut ctrl = make_ctrl();
+        ctrl.handle_key(KeyCode::KeyW, ElementState::Pressed);
+        let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
+        assert!(cam.position.x > 0.0, "expected x > 0, got {}", cam.position.x);
+        assert_eq!(cam.position.y, 0.0);
+    }
+
+    #[test]
+    fn s_moves_backward() {
+        // yaw=0 → backward is -X in world space
+        let mut ctrl = make_ctrl();
+        ctrl.handle_key(KeyCode::KeyS, ElementState::Pressed);
+        let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
+        assert!(cam.position.x < 0.0, "expected x < 0, got {}", cam.position.x);
+    }
+
+    #[test]
+    fn arrow_up_aliases_forward() {
+        let mut ctrl = make_ctrl();
+        ctrl.handle_key(KeyCode::ArrowUp, ElementState::Pressed);
+        let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
+        assert!(cam.position.x > 0.0, "expected x > 0, got {}", cam.position.x);
+    }
+
+    #[test]
+    fn touch_forward_moves_without_keys() {
+        // Touch input should drive movement even when no key is held.
+        let mut ctrl = make_ctrl();
+        ctrl.touch.forward = 1.0;
+        let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
+        assert!(cam.position.x > 0.0, "expected x > 0, got {}", cam.position.x);
+    }
+
+    #[test]
+    fn mouse_dx_changes_yaw() {
+        let mut ctrl = make_ctrl();
+        ctrl.handle_mouse(10.0, 0.0);
+        let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
+        assert!(cam.yaw_rad > 0.0, "expected yaw > 0, got {}", cam.yaw_rad);
+    }
+
+    #[test]
+    fn mouse_dy_down_tilts_camera_down() {
+        // positive mouse_dy (moving mouse downward) → negative pitch (looking down)
+        let mut ctrl = make_ctrl();
+        ctrl.handle_mouse(0.0, 5.0);
+        let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
+        assert!(cam.pitch_rad < 0.0, "expected pitch < 0, got {}", cam.pitch_rad);
+    }
+
+    #[test]
+    fn pitch_clamped_to_safe_range() {
+        let mut ctrl = CameraController::new(1.0, 100.0, 1.0);
+        ctrl.handle_mouse(0.0, -10_000.0); // large upward movement
+        let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
+        assert!(
+            cam.pitch_rad <= SAFE_FRAC_PI_2,
+            "pitch not clamped: {}",
+            cam.pitch_rad
+        );
+    }
+
+    // --- Orbit camera ---
+
+    #[test]
+    fn orbit_zoom_keeps_positive_distance() {
+        // Zooming out far should not drive distance negative (clamped at 0.1).
+        let mut ctrl = CameraController::new(1.0, 1.0, 100.0);
+        ctrl.handle_key(KeyCode::Minus, ElementState::Pressed); // zoom out
+        let mut camera = Camera::Orbit(OrbitCamera::new(BodyId::TEST, 1.0, 0.0, 0.0));
+        ctrl.update_camera(&mut camera, Duration::from_secs(10));
+        match camera {
+            Camera::Orbit(c) => assert!(c.dist >= 0.1, "dist not clamped: {}", c.dist),
+            _ => unreachable!(),
+        }
+    }
+}

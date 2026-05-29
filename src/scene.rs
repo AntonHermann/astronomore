@@ -5,6 +5,12 @@ use crate::celestial_body::CelestialBody;
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct BodyId(usize);
 
+#[cfg(test)]
+impl BodyId {
+    /// A placeholder id for tests that need a `BodyId` but never index into a scene.
+    pub(crate) const TEST: BodyId = BodyId(0);
+}
+
 pub struct Scene {
     pub celestial_bodies: Vec<CelestialBody>,
     pub model_bind_group_layout: wgpu::BindGroupLayout,

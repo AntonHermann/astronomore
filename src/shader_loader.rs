@@ -104,3 +104,36 @@ fn validation_error_to_diagnostic(
         labels,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MINIMAL_VALID_SHADER: &str = "
+        @vertex
+        fn vs_main() -> @builtin(position) vec4<f32> {
+            return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+        }
+    ";
+
+    #[test]
+    fn valid_shader_passes() {
+        assert!(validate_wgsl("test.wgsl", MINIMAL_VALID_SHADER).is_ok());
+    }
+
+    #[test]
+    fn syntax_error_returns_err() {
+        assert!(validate_wgsl("test.wgsl", "this is not {{ valid }} wgsl !!!").is_err());
+    }
+
+    #[test]
+    fn undefined_variable_returns_err() {
+        let src = "
+            @vertex
+            fn vs_main() -> @builtin(position) vec4<f32> {
+                return undefined_variable;
+            }
+        ";
+        assert!(validate_wgsl("test.wgsl", src).is_err());
+    }
+}
