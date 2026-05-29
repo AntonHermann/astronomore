@@ -1,5 +1,3 @@
-use wgpu::util::DeviceExt;
-
 /// GPU-side representation of scene-level rendering parameters.
 ///
 /// Memory layout matches the WGSL `SceneProperties` struct at `@group(3) @binding(0)`.
@@ -55,34 +53,19 @@ pub struct SceneProperties {
 impl SceneProperties {
     /// Create the bind group layout, initial GPU buffer, and bind group.
     pub fn new(device: &wgpu::Device) -> Self {
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("scene_properties_bind_group_layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
+        let bind_group_layout = crate::gpu::uniform_bind_group_layout(
+            device,
+            "scene_properties_bind_group_layout",
+            wgpu::ShaderStages::FRAGMENT,
+        );
 
         let uniform = ScenePropertiesUniform::default();
-        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Scene Properties Buffer"),
-            contents: bytemuck::cast_slice(&[uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Scene Properties Bind Group"),
-            layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: buffer.as_entire_binding(),
-            }],
-        });
+        let (buffer, bind_group) = crate::gpu::uniform_buffer_and_bind_group(
+            device,
+            "Scene Properties",
+            &uniform,
+            &bind_group_layout,
+        );
 
         Self {
             uniform,

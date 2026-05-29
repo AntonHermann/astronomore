@@ -1,9 +1,60 @@
 use std::sync::Arc;
 
 use miette::IntoDiagnostic;
+use wgpu::util::DeviceExt;
 use winit::window::Window;
 
 use crate::texture;
+
+/// Create a bind group layout for a single uniform buffer at binding 0.
+///
+/// Every uniform in this project (camera, model, scene properties) uses the
+/// same single-binding layout, differing only in label and shader visibility.
+pub fn uniform_bind_group_layout(
+    device: &wgpu::Device,
+    label: &str,
+    visibility: wgpu::ShaderStages,
+) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some(label),
+        entries: &[wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        }],
+    })
+}
+
+/// Create a `UNIFORM | COPY_DST` buffer initialised with `data` plus a bind
+/// group binding it at binding 0 of `layout`.
+///
+/// `label` is used as a prefix for both the buffer and bind group debug labels.
+pub fn uniform_buffer_and_bind_group<T: bytemuck::Pod>(
+    device: &wgpu::Device,
+    label: &str,
+    data: &T,
+    layout: &wgpu::BindGroupLayout,
+) -> (wgpu::Buffer, wgpu::BindGroup) {
+    let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some(&format!("{label} Buffer")),
+        contents: bytemuck::cast_slice(std::slice::from_ref(data)),
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+    });
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some(&format!("{label} Bind Group")),
+        layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: buffer.as_entire_binding(),
+        }],
+    });
+    (buffer, bind_group)
+}
 
 /// Window-bound wgpu plumbing: instance/adapter/device/queue plus the swapchain
 /// surface and its companion depth buffer.

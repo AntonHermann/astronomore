@@ -69,14 +69,25 @@ impl Pipelines {
         let grid_src = loader::load_str("src/shaders/grid.wgsl").await?;
         shader_loader::validate_wgsl("grid.wgsl", &grid_src)?;
         let grid_module = shader_loader::make_shader_module(device, "grid.wgsl", &grid_src);
-        let grid = build_grid_pipeline(device, &grid_layout, &grid_module, surface_format);
+        let grid = build_line_pipeline(
+            device,
+            &grid_layout,
+            &grid_module,
+            surface_format,
+            "Grid Pipeline",
+        );
 
         let normals_src = loader::load_str("src/shaders/normals.wgsl").await?;
         shader_loader::validate_wgsl("normals.wgsl", &normals_src)?;
         let normals_module =
             shader_loader::make_shader_module(device, "normals.wgsl", &normals_src);
-        let normals =
-            build_normals_pipeline(device, &normals_layout, &normals_module, surface_format);
+        let normals = build_line_pipeline(
+            device,
+            &normals_layout,
+            &normals_module,
+            surface_format,
+            "Normals Pipeline",
+        );
 
         Ok(Self {
             main_layout,
@@ -137,7 +148,13 @@ impl Pipelines {
         match shader_loader::validate_wgsl("grid.wgsl", &src) {
             Ok(()) => {
                 let module = shader_loader::make_shader_module(device, "grid.wgsl", &src);
-                self.grid = build_grid_pipeline(device, &self.grid_layout, &module, surface_format);
+                self.grid = build_line_pipeline(
+                    device,
+                    &self.grid_layout,
+                    &module,
+                    surface_format,
+                    "Grid Pipeline",
+                );
                 tracing::info!("grid.wgsl neu geladen");
             }
             Err(e) => tracing::error!(error = ?e, "shader validation failed"),
@@ -164,8 +181,13 @@ impl Pipelines {
         match shader_loader::validate_wgsl("normals.wgsl", &src) {
             Ok(()) => {
                 let module = shader_loader::make_shader_module(device, "normals.wgsl", &src);
-                self.normals =
-                    build_normals_pipeline(device, &self.normals_layout, &module, surface_format);
+                self.normals = build_line_pipeline(
+                    device,
+                    &self.normals_layout,
+                    &module,
+                    surface_format,
+                    "Normals Pipeline",
+                );
                 tracing::info!("normals.wgsl neu geladen");
             }
             Err(e) => tracing::error!(error = ?e, "shader validation failed"),
@@ -241,65 +263,19 @@ fn build_main_pipelines(
     (fill, wire)
 }
 
-fn build_normals_pipeline(
+/// Build an unlit `LineList` pipeline over `ColorVertex` geometry.
+///
+/// Shared by the grid and normals overlays, which differ only in their shader
+/// module, pipeline layout, and debug label.
+fn build_line_pipeline(
     device: &wgpu::Device,
     layout: &wgpu::PipelineLayout,
     module: &wgpu::ShaderModule,
     surface_format: wgpu::TextureFormat,
+    label: &str,
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Normals Pipeline"),
-        layout: Some(layout),
-        vertex: wgpu::VertexState {
-            module,
-            entry_point: Some("vs_main"),
-            buffers: &[ColorVertex::desc()],
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-        },
-        fragment: Some(wgpu::FragmentState {
-            module,
-            entry_point: Some("fs_main"),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: surface_format,
-                blend: Some(wgpu::BlendState::REPLACE),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-        }),
-        primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::LineList,
-            strip_index_format: None,
-            front_face: wgpu::FrontFace::Ccw,
-            cull_mode: None,
-            polygon_mode: wgpu::PolygonMode::Fill,
-            unclipped_depth: false,
-            conservative: false,
-        },
-        depth_stencil: Some(wgpu::DepthStencilState {
-            format: texture::Texture::DEPTH_FORMAT,
-            depth_write_enabled: Some(true),
-            depth_compare: Some(wgpu::CompareFunction::Less),
-            stencil: wgpu::StencilState::default(),
-            bias: wgpu::DepthBiasState::default(),
-        }),
-        multisample: wgpu::MultisampleState {
-            count: 1,
-            mask: !0,
-            alpha_to_coverage_enabled: false,
-        },
-        multiview_mask: None,
-        cache: None,
-    })
-}
-
-fn build_grid_pipeline(
-    device: &wgpu::Device,
-    layout: &wgpu::PipelineLayout,
-    module: &wgpu::ShaderModule,
-    surface_format: wgpu::TextureFormat,
-) -> wgpu::RenderPipeline {
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Grid Pipeline"),
+        label: Some(label),
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module,

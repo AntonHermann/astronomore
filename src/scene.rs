@@ -12,20 +12,12 @@ pub struct Scene {
 
 impl Scene {
     pub fn new(device: &wgpu::Device) -> Self {
-        let model_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX, // only the vertex shader needs to see this
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-                label: Some("model_bind_group_layout"),
-            });
+        // only the vertex shader needs to see the model transform
+        let model_bind_group_layout = crate::gpu::uniform_bind_group_layout(
+            device,
+            "model_bind_group_layout",
+            wgpu::ShaderStages::VERTEX,
+        );
         Self {
             celestial_bodies: Vec::new(),
             model_bind_group_layout,
