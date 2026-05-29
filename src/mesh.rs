@@ -65,9 +65,8 @@ pub struct Mesh {
     pub num_elements: u32,
 }
 
-#[allow(unused)]
 impl Mesh {
-    pub fn new(device: &wgpu::Device, name: &str, vertices: &[Vertex], indices: &[u32]) -> Self {
+    fn new(device: &wgpu::Device, name: &str, vertices: &[Vertex], indices: &[u32]) -> Self {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("[{name}] Vertex Buffer")),
             contents: bytemuck::cast_slice(vertices),
@@ -90,29 +89,6 @@ impl Mesh {
         }
     }
 
-    pub fn simple_pentagon(device: &wgpu::Device) -> Self {
-        #[rustfmt::skip]
-        let vertices: &[Vertex] = &[
-            Vertex { position: [-0.0868241 ,  0.49240386, 0.0], tex_coords: [0.4131759   , 0.00759614], normal: [0.0, 0.0, 1.0] }, // A
-            Vertex { position: [-0.49513406,  0.06958647, 0.0], tex_coords: [0.0048659444, 0.43041354], normal: [0.0, 0.0, 1.0] }, // B
-            Vertex { position: [-0.21918549, -0.44939706, 0.0], tex_coords: [0.28081453  , 0.949397  ], normal: [0.0, 0.0, 1.0] }, // C
-            Vertex { position: [ 0.35966998, -0.3473291 , 0.0], tex_coords: [0.85967     , 0.84732914], normal: [0.0, 0.0, 1.0] }, // D
-            Vertex { position: [ 0.44147372,  0.2347359 , 0.0], tex_coords: [0.9414737   , 0.2652641 ], normal: [0.0, 0.0, 1.0] }, // E
-        ];
-
-        #[rustfmt::skip]
-        let indices: &[u32] = &[
-            0, 1, 4, // ABE
-            1, 2, 4, // BCE
-            2, 3, 4, // CDE
-        ];
-
-        Self::new(device, "pentagon", vertices, indices)
-    }
-
-    pub fn default_sphere(device: &wgpu::Device) -> Self {
-        Self::sphere(device, 32, 16)
-    }
     pub fn sphere(device: &wgpu::Device, num_meridians: u32, num_parallels: u32) -> Self {
         use std::f32::consts::PI;
 
@@ -164,73 +140,5 @@ impl Mesh {
 
         let indices: Vec<u32> = indices.iter().flat_map(|tri| tri.to_vec()).collect();
         Self::new(device, "sphere", &vertices, &indices)
-    }
-
-    pub fn x_plane(device: &wgpu::Device) -> Self {
-        #[rustfmt::skip]
-        let vertices: &[Vertex] = &[
-            Vertex { position: [0., -1., -1.], tex_coords: [0.2, 0.2], normal: [-1.0, 0.0, 0.0] }, // A
-            Vertex { position: [0.,  1., -1.], tex_coords: [0.2, 0.0], normal: [-1.0, 0.0, 0.0] }, // B
-            Vertex { position: [0.,  1.,  1.], tex_coords: [0.0, 0.0], normal: [-1.0, 0.0, 0.0] }, // C
-            Vertex { position: [0., -1.,  1.], tex_coords: [0.0, 0.2], normal: [-1.0, 0.0, 0.0] }, // D
-        ];
-
-        #[rustfmt::skip]
-        let indices: &[u32] = &[
-            0, 1, 2, // ABC
-            2, 3, 0, // CDA
-        ];
-
-        Self::new(device, "x-plane", vertices, indices)
-    }
-    pub fn y_plane(device: &wgpu::Device) -> Self {
-        #[rustfmt::skip]
-        let vertices: &[Vertex] = &[
-            Vertex { position: [-1., 0., -1.], tex_coords: [0.8, 0.0], normal: [0.0, -1.0, 0.0] }, // A
-            Vertex { position: [ 1., 0., -1.], tex_coords: [1.0, 0.0], normal: [0.0, -1.0, 0.0] }, // B
-            Vertex { position: [ 1., 0.,  1.], tex_coords: [1.0, 0.2], normal: [0.0, -1.0, 0.0] }, // C
-            Vertex { position: [-1., 0.,  1.], tex_coords: [0.8, 0.2], normal: [0.0, -1.0, 0.0] }, // D
-        ];
-
-        #[rustfmt::skip]
-        let indices: &[u32] = &[
-            0, 2, 1, // ACB
-            2, 0, 3, // CDA
-        ];
-
-        Self::new(device, "y-plane", vertices, indices)
-    }
-    pub fn z_plane(device: &wgpu::Device) -> Self {
-        #[rustfmt::skip]
-        let vertices: &[Vertex] = &[
-            Vertex { position: [-1., -1., 0.], tex_coords: [0.8, 1.0], normal: [0.0, 0.0, -1.0] }, // A
-            Vertex { position: [ 1., -1., 0.], tex_coords: [1.0, 1.0], normal: [0.0, 0.0, -1.0] }, // B
-            Vertex { position: [ 1.,  1., 0.], tex_coords: [1.0, 0.8], normal: [0.0, 0.0, -1.0] }, // C
-            Vertex { position: [-1.,  1., 0.], tex_coords: [0.8, 0.8], normal: [0.0, 0.0, -1.0] }, // D
-        ];
-
-        #[rustfmt::skip]
-        let indices: &[u32] = &[
-            0, 1, 2, // ABC
-            2, 3, 0, // CDA
-        ];
-
-        Self::new(device, "z-plane", vertices, indices)
-    }
-}
-
-pub trait DrawMesh<'a> {
-    fn draw_mesh(&mut self, mesh: &'a Mesh);
-    fn draw_mesh_instanced(&mut self, mesh: &'a Mesh, instances: std::ops::Range<u32>);
-}
-impl<'a, 'b: 'a> DrawMesh<'b> for wgpu::RenderPass<'a> {
-    fn draw_mesh(&mut self, mesh: &'b Mesh) {
-        self.draw_mesh_instanced(mesh, 0..1);
-    }
-
-    fn draw_mesh_instanced(&mut self, mesh: &'b Mesh, instances: std::ops::Range<u32>) {
-        self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-        self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        self.draw_indexed(0..mesh.num_elements, 0, instances);
     }
 }

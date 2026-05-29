@@ -1,6 +1,5 @@
 use std::f32::consts::FRAC_PI_2;
 use web_time::Duration;
-use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalPosition;
 use winit::event::*;
 use winit::keyboard::KeyCode;
@@ -22,11 +21,9 @@ pub enum Camera {
     Orbit(OrbitCamera),
 }
 impl Camera {
-    #[allow(dead_code)]
     pub fn new_fps(position: impl Into<glam::Vec3>, yaw_rad: f32, pitch_rad: f32) -> Self {
         Self::Fps(FpsCamera::new(position, yaw_rad, pitch_rad))
     }
-    #[allow(dead_code)]
     pub fn new_orbit(target: BodyId, dist: f32, yaw_rad: f32, pitch_rad: f32) -> Self {
         Self::Orbit(OrbitCamera::new(target, dist, yaw_rad, pitch_rad))
     }
@@ -429,34 +426,17 @@ impl CameraRig {
         let mut uniform = CameraUniform::new();
         uniform.update_view_proj(&camera, &projection, scene);
 
-        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Camera Buffer"),
-            contents: bytemuck::cast_slice(&[uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-            label: Some("camera_bind_group_layout"),
-        });
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: buffer.as_entire_binding(),
-            }],
-            label: Some("Camera Bind Group"),
-        });
+        let bind_group_layout = crate::gpu::uniform_bind_group_layout(
+            device,
+            "camera_bind_group_layout",
+            wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+        );
+        let (buffer, bind_group) = crate::gpu::uniform_buffer_and_bind_group(
+            device,
+            "Camera",
+            &uniform,
+            &bind_group_layout,
+        );
 
         Self {
             camera,

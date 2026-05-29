@@ -1,5 +1,3 @@
-use wgpu::util::DeviceExt;
-
 use crate::grid::{ColorVertex, GridMesh};
 use crate::{mesh, texture};
 
@@ -63,29 +61,7 @@ impl CelestialBody {
     ) -> Self {
         tracing::debug!(name, radius, "creating celestial body");
         let mesh = mesh::Mesh::sphere(device, 128, 64);
-
-        let normals_vertices: Vec<ColorVertex> = mesh
-            .vertices
-            .iter()
-            .flat_map(|v| {
-                let end = [
-                    v.position[0] + v.normal[0] * NORMAL_SCALE,
-                    v.position[1] + v.normal[1] * NORMAL_SCALE,
-                    v.position[2] + v.normal[2] * NORMAL_SCALE,
-                ];
-                [
-                    ColorVertex {
-                        position: v.position,
-                        color: NORMAL_COLOR,
-                    },
-                    ColorVertex {
-                        position: end,
-                        color: NORMAL_COLOR,
-                    },
-                ]
-            })
-            .collect();
-        let normals_mesh = GridMesh::build(device, &format!("{name} Normals"), normals_vertices);
+        let normals_mesh = build_normals_mesh(device, &mesh, name);
 
         let orbital_parameters = OrbitalParameters {
             parent_id: None,
@@ -93,21 +69,12 @@ impl CelestialBody {
         };
 
         let model_uniform = ModelUniform::new(&glam::Mat4::IDENTITY, &glam::Mat4::IDENTITY, radius);
-
-        let model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("{} Model Buffer", name)),
-            contents: bytemuck::cast_slice(&[model_uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let model_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: model_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: model_buffer.as_entire_binding(),
-            }],
-            label: Some(&format!("{} Model Bind Group", name)),
-        });
+        let (model_buffer, model_bind_group) = crate::gpu::uniform_buffer_and_bind_group(
+            device,
+            &format!("{name} Model"),
+            &model_uniform,
+            model_bind_group_layout,
+        );
 
         Self {
             name: name.into(),
@@ -149,31 +116,36 @@ impl CelestialBody {
     /// Rebuild the sphere mesh and normals overlay with new tessellation parameters.
     pub fn rebuild_mesh(&mut self, device: &wgpu::Device, meridians: u32, parallels: u32) {
         let new_mesh = mesh::Mesh::sphere(device, meridians, parallels);
-        let normals_vertices: Vec<ColorVertex> = new_mesh
-            .vertices
-            .iter()
-            .flat_map(|v| {
-                let end = [
-                    v.position[0] + v.normal[0] * NORMAL_SCALE,
-                    v.position[1] + v.normal[1] * NORMAL_SCALE,
-                    v.position[2] + v.normal[2] * NORMAL_SCALE,
-                ];
-                [
-                    ColorVertex {
-                        position: v.position,
-                        color: NORMAL_COLOR,
-                    },
-                    ColorVertex {
-                        position: end,
-                        color: NORMAL_COLOR,
-                    },
-                ]
-            })
-            .collect();
-        self.normals_mesh =
-            GridMesh::build(device, &format!("{} Normals", self.name), normals_vertices);
+        self.normals_mesh = build_normals_mesh(device, &new_mesh, &self.name);
         self.mesh = new_mesh;
     }
+}
+
+/// Build a line-list overlay mesh that draws a short coloured segment along each
+/// vertex normal of `mesh`, used by the normals-visualisation pipeline.
+fn build_normals_mesh(device: &wgpu::Device, mesh: &mesh::Mesh, name: &str) -> GridMesh {
+    let normals_vertices: Vec<ColorVertex> = mesh
+        .vertices
+        .iter()
+        .flat_map(|v| {
+            let end = [
+                v.position[0] + v.normal[0] * NORMAL_SCALE,
+                v.position[1] + v.normal[1] * NORMAL_SCALE,
+                v.position[2] + v.normal[2] * NORMAL_SCALE,
+            ];
+            [
+                ColorVertex {
+                    position: v.position,
+                    color: NORMAL_COLOR,
+                },
+                ColorVertex {
+                    position: end,
+                    color: NORMAL_COLOR,
+                },
+            ]
+        })
+        .collect();
+    GridMesh::build(device, &format!("{name} Normals"), normals_vertices)
 }
 
 pub trait DrawCelestialBody<'a> {

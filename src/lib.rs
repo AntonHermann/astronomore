@@ -24,7 +24,6 @@ pub use texture::Texture;
 use std::sync::Arc;
 
 use miette::IntoDiagnostic;
-use wgpu::util::DeviceExt;
 use winit::{
     application::ApplicationHandler,
     event::*,
@@ -39,7 +38,6 @@ use wasm_bindgen::prelude::*;
 use winit::platform::web::EventLoopExtWebSys;
 
 use crate::grid::{DrawGrid, GridMesh};
-use crate::mesh::DrawMesh;
 use crate::{
     camera::{Camera, CameraRig},
     celestial_body::{DrawCelestialBody, DrawCelestialBodyNormals},
@@ -56,10 +54,6 @@ pub struct State {
     grid_xy: GridMesh,
     grid_yz: GridMesh,
     view: ui::ViewOptions,
-    meshes: Vec<mesh::Mesh>,
-    diffuse_texture: texture::Texture,
-    // diffuse_bind_group: wgpu::BindGroup,
-    identity_model_bind_group: wgpu::BindGroup,
     scene: scene::Scene,
     scene_properties: scene_properties::SceneProperties,
     sim: sim::SimState,
@@ -77,14 +71,6 @@ impl State {
         let size = winit::dpi::PhysicalSize::new(config.width, config.height);
 
         let texture_bind_group_layout = texture::Texture::bind_group_layout(device);
-        let diffuse_bytes = loader::load_bytes("assets/textures/dbg.png").await?;
-        let diffuse_texture = texture::Texture::from_bytes(
-            device,
-            queue,
-            &diffuse_bytes,
-            "dbg.png",
-            &texture_bind_group_layout,
-        )?;
 
         // ==================== Scene setup =====================
         let mut scene = scene::Scene::new(device);
@@ -138,27 +124,6 @@ impl State {
         let grid_xy = GridMesh::xy_plane(device, 10);
         let grid_yz = GridMesh::yz_plane(device, 10);
 
-        let identity_model_uniform = celestial_body::ModelUniform::default();
-        let identity_model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Identity Model Buffer"),
-            contents: bytemuck::cast_slice(&[identity_model_uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let identity_model_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &scene.model_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: identity_model_buffer.as_entire_binding(),
-            }],
-            label: Some("Identity Model Bind Group"),
-        });
-        let meshes = vec![
-            // mesh::Mesh::default_sphere(&device),
-            // mesh::Mesh::x_plane(&device),
-            // mesh::Mesh::y_plane(&device),
-            // mesh::Mesh::z_plane(&device),
-        ];
-
         // ==================== egui setup ====================
         let ui_layer = ui::EguiLayer::new(device, &gpu.window, surface_format);
 
@@ -171,9 +136,6 @@ impl State {
             grid_xy,
             grid_yz,
             view: ui::ViewOptions::new(),
-            meshes,
-            identity_model_bind_group,
-            diffuse_texture,
             scene,
             scene_properties,
             sim: sim::SimState::new(),
@@ -291,19 +253,11 @@ impl State {
                 "set pipeline"
             );
             render_pass.set_pipeline(pipeline);
-            tracing::trace!(group = 0, "set bind group: diffuse texture");
-            render_pass.set_bind_group(0, &self.diffuse_texture.bind_group, &[]);
-            tracing::trace!(group = 1, "set bind group: camera");
-            render_pass.set_bind_group(1, &self.camera_rig.bind_group, &[]);
-            tracing::trace!(group = 2, "set bind group: identity model");
-            render_pass.set_bind_group(2, &self.identity_model_bind_group, &[]);
+            // Group 3 (scene properties) is shared by every body and never
+            // rebound in the per-body draw, so it is set once here. Groups 0
+            // (texture), 1 (camera) and 2 (model) are bound per body.
             tracing::trace!(group = 3, "set bind group: scene properties");
             render_pass.set_bind_group(3, &self.scene_properties.bind_group, &[]);
-
-            tracing::trace!(count = self.meshes.len(), "draw meshes");
-            for mesh in &self.meshes {
-                render_pass.draw_mesh(mesh);
-            }
 
             // TODO: move this logic into the scene and/or celestial body
             tracing::trace!(
