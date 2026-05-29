@@ -1,3 +1,4 @@
+mod arrow;
 mod camera;
 mod celestial_body;
 mod gpu;
@@ -40,6 +41,7 @@ use wasm_bindgen::prelude::*;
 use winit::platform::web::EventLoopExtWebSys;
 
 use crate::{
+    arrow::{Arrow, ArrowMesh, DrawArrows},
     camera::{Camera, CameraRig},
     celestial_body::DrawCelestialBodyNormals,
     gpu::GpuContext,
@@ -61,6 +63,7 @@ pub struct State {
     grid_xz: GridMesh,
     grid_xy: GridMesh,
     grid_yz: GridMesh,
+    arrow_mesh: ArrowMesh,
     view: ViewOptions,
     meshes: Vec<Mesh>,
     diffuse_texture: Texture,
@@ -138,6 +141,7 @@ impl State {
         let grid_xz = GridMesh::xz_plane(device, 10);
         let grid_xy = GridMesh::xy_plane(device, 10);
         let grid_yz = GridMesh::yz_plane(device, 10);
+        let arrow_mesh = ArrowMesh::new(device, 600);
 
         let identity_model_uniform = celestial_body::ModelUniform::default();
         let identity_model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -171,6 +175,7 @@ impl State {
             grid_xz,
             grid_xy,
             grid_yz,
+            arrow_mesh,
             view: ui::ViewOptions::new(),
             meshes,
             identity_model_bind_group,
@@ -199,6 +204,65 @@ impl State {
         self.scene.update(self.sim.time, &self.gpu.queue);
         self.camera_rig.update(dt, &self.scene, &self.gpu.queue);
         self.scene_properties.update(&self.gpu.queue);
+        if self.view.show_arrows {
+            let arrows = self.build_arrows();
+            self.arrow_mesh.update(&self.gpu.queue, &arrows);
+        }
+    }
+
+    /// Build the list of debug arrows for the current frame.
+    fn build_arrows(&self) -> Vec<Arrow> {
+        const VEL_LEN: f32 = 3.0;
+        const RAD_LEN: f32 = 3.0;
+        const SPIN_LEN: f32 = 1.5;
+        const VEL_COLOR: [f32; 4] = [0.0, 0.8, 1.0, 1.0];
+        const RAD_COLOR: [f32; 4] = [1.0, 0.5, 0.0, 1.0];
+        const SPIN_COLOR: [f32; 4] = [0.2, 1.0, 0.4, 1.0];
+
+        let sim_time = self.sim.time;
+        let mut arrows = Vec::new();
+
+        for body in &self.scene.celestial_bodies {
+            let origin = body.world_position;
+
+            if self.view.arrows_velocity {
+                let vel = orbital::orbital_velocity(body.orbital_parameters.model, sim_time);
+                if vel.length_squared() > 1e-14 {
+                    let dir = vel.normalize();
+                    arrows.push(Arrow {
+                        start: origin,
+                        end: origin + dir * VEL_LEN,
+                        color: VEL_COLOR,
+                    });
+                }
+            }
+
+            if self.view.arrows_radial {
+                let parent_pos = match body.orbital_parameters.parent_id {
+                    Some(pid) => self.scene.celestial_bodies[pid].world_position,
+                    None => Vec3::ZERO,
+                };
+                let to_parent = parent_pos - origin;
+                if to_parent.length_squared() > 1e-4 {
+                    let dir = to_parent.normalize();
+                    arrows.push(Arrow {
+                        start: origin,
+                        end: origin + dir * RAD_LEN,
+                        color: RAD_COLOR,
+                    });
+                }
+            }
+
+            if self.view.arrows_spin {
+                let spin_axis = body.spin_transform.transform_vector3(Vec3::Y).normalize();
+                arrows.push(Arrow {
+                    start: origin,
+                    end: origin + spin_axis * SPIN_LEN,
+                    color: SPIN_COLOR,
+                });
+            }
+        }
+        arrows
     }
 
     pub fn render(&mut self) -> miette::Result<()> {
@@ -326,6 +390,13 @@ impl State {
                 }
             }
 
+            if self.view.show_arrows {
+                tracing::trace!("set pipeline: grid (arrows)");
+                render_pass.set_pipeline(&self.pipelines.grid);
+                render_pass.set_bind_group(0, &self.camera_rig.bind_group, &[]);
+                render_pass.draw_arrows(&self.arrow_mesh);
+            }
+
             tracing::trace!("set pipeline: grid");
             render_pass.set_pipeline(&self.pipelines.grid);
             tracing::trace!(group = 0, "set bind group: camera (grid)");
@@ -451,6 +522,18 @@ impl State {
                     if ui.button(names_label).on_hover_text("Toggle (L)").clicked() {
                         view.toggle_body_names();
                     }
+                    let arrows_label = if view.show_arrows {
+                        "Arrows: on"
+                    } else {
+                        "Arrows: off"
+                    };
+                    if ui
+                        .button(arrows_label)
+                        .on_hover_text("Toggle (V)")
+                        .clicked()
+                    {
+                        view.toggle_arrows();
+                    }
                 });
                 ui.separator();
                 egui::CollapsingHeader::new("Grid")
@@ -460,6 +543,15 @@ impl State {
                         ui.checkbox(&mut view.show_grid_xz, "XZ plane (ground)");
                         ui.checkbox(&mut view.show_grid_xy, "XY plane");
                         ui.checkbox(&mut view.show_grid_yz, "YZ plane");
+                    });
+                ui.separator();
+                egui::CollapsingHeader::new("Arrows")
+                    .default_open(false)
+                    .show(ui, |ui| {
+                        ui.label("V = toggle all");
+                        ui.checkbox(&mut view.arrows_velocity, "Velocity (cyan)");
+                        ui.checkbox(&mut view.arrows_radial, "Radial (orange)");
+                        ui.checkbox(&mut view.arrows_spin, "Spin axis (green)");
                     });
                 ui.separator();
                 egui::CollapsingHeader::new("Scene Properties")
@@ -942,6 +1034,8 @@ impl State {
             self.view.toggle_all_grids();
         } else if code == KeyCode::KeyL && state.is_pressed() {
             self.view.toggle_body_names();
+        } else if code == KeyCode::KeyV && state.is_pressed() {
+            self.view.toggle_arrows();
         } else {
             self.camera_rig.controller.handle_key(code, state);
         }

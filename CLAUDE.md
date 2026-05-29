@@ -110,6 +110,7 @@ just san        # cargo fmt + clippy -D warnings
 | Tab | Wireframe-Modus (nur nativ) |
 | N | Normalenvisualisierung umschalten |
 | L | Körper-Namen-Labels umschalten |
+| V | Debug-Pfeile (Velocity/Radial/Spin) umschalten |
 | G | Alle Gitter umschalten |
 | Escape | Beenden |
 

@@ -78,6 +78,7 @@ impl Scene {
                 None => relative_orbital_transform,
             };
             model_world_transforms.push(world_transform);
+            self.celestial_bodies[i].world_position = world_transform.w_axis.truncate();
 
             // update the model uniform for this celestial body
             self.celestial_bodies[i].update_model_uniform(world_transform);

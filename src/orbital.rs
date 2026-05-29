@@ -85,6 +85,33 @@ pub fn jde_to_gregorian(jde: f64) -> (i32, u8, u8) {
     (year, month, day)
 }
 
+/// Compute the approximate orbital velocity of a body in scene units per second.
+///
+/// Uses a 1-hour forward difference for VSOP87, analytic tangent for Parametric,
+/// and zero for Fixed bodies.
+pub fn orbital_velocity(model: OrbitalModel, sim_time: f64) -> Vec3 {
+    match model {
+        OrbitalModel::Fixed => Vec3::ZERO,
+        OrbitalModel::Parametric {
+            radius,
+            angular_velocity,
+        } => {
+            let angle = angular_velocity * sim_time as f32;
+            Vec3::new(
+                -angle.sin() * radius * angular_velocity,
+                0.0,
+                angle.cos() * radius * angular_velocity,
+            )
+        }
+        OrbitalModel::Vsop87 { body } => {
+            let dt = 3_600.0_f64; // 1 hour
+            let p0 = heliocentric_position(body, sim_time);
+            let p1 = heliocentric_position(body, sim_time + dt);
+            (p1 - p0) / dt as f32
+        }
+    }
+}
+
 /// Computes the heliocentric scene-space position of a planet using VSOP87A.
 ///
 /// `sim_time_s` is seconds elapsed since J2000.0 (2000-01-01 12:00 TT).
