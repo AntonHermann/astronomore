@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::orbital::{OrbitalModel, Vsop87Body};
 
 /// Typed index into the [`BODIES`] array. The discriminant equals the array index,
@@ -9,6 +7,7 @@ use crate::orbital::{OrbitalModel, Vsop87Body};
 /// so that parents are always inserted into the scene before their children.
 #[repr(usize)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
+#[allow(dead_code)]
 pub enum SolarSystemBody {
     Sun = 0,
     Mercury = 1,

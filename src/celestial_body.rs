@@ -1,7 +1,14 @@
+use std::ops::Range;
+
+use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
-use crate::grid::{ColorVertex, GridMesh};
-use crate::{mesh, texture};
+use crate::{
+    grid::{ColorVertex, GridMesh},
+    mesh::Mesh,
+    orbital::{self, OrbitalModel},
+    texture::Texture,
+};
 
 const NORMAL_SCALE: f32 = 0.15;
 const NORMAL_COLOR: [f32; 4] = [0.2, 1.0, 0.4, 1.0];
@@ -12,8 +19,8 @@ pub struct ModelUniform {
     pub model_to_world_transform: [[f32; 4]; 4],
 }
 impl ModelUniform {
-    pub fn new(world_transform: &glam::Mat4, spin_transform: &glam::Mat4, radius: f32) -> Self {
-        let scale = glam::Mat4::from_scale(glam::Vec3::splat(radius));
+    pub fn new(world_transform: &Mat4, spin_transform: &Mat4, radius: f32) -> Self {
+        let scale = Mat4::from_scale(Vec3::splat(radius));
         let model_matrix = world_transform * spin_transform * scale;
         Self {
             model_to_world_transform: model_matrix.to_cols_array_2d(),
@@ -23,7 +30,7 @@ impl ModelUniform {
 impl Default for ModelUniform {
     fn default() -> Self {
         Self {
-            model_to_world_transform: glam::Mat4::IDENTITY.to_cols_array_2d(),
+            model_to_world_transform: Mat4::IDENTITY.to_cols_array_2d(),
         }
     }
 }
@@ -32,21 +39,21 @@ pub struct OrbitalParameters {
     /// Optional index of the parent celestial body in the scene's celestial_bodies list. None if this is a root body (e.g. the sun)
     pub parent_id: Option<usize>,
     /// Determines how the orbital position is computed each frame.
-    pub model: crate::orbital::OrbitalModel,
+    pub model: OrbitalModel,
 }
 
 pub struct CelestialBody {
     #[allow(dead_code)]
     pub name: String,
-    texture: texture::Texture,
-    mesh: mesh::Mesh,
+    texture: Texture,
+    mesh: Mesh,
     pub normals_mesh: GridMesh,
     pub radius: f32,
     pub orbital_parameters: OrbitalParameters,
     /// Transform from model space to parent space (world space if no parent)
-    pub orbital_transform: glam::Mat4,
+    pub orbital_transform: Mat4,
     /// Transform in model space to apply spin (e.g. rotation around its own axis)
-    pub spin_transform: glam::Mat4,
+    pub spin_transform: Mat4,
     /// Uniform containing the combined model transform (world * spin) and radius for this body, to be passed to the shader
     pub model_uniform: ModelUniform,
     pub model_buffer: wgpu::Buffer,
@@ -57,12 +64,12 @@ impl CelestialBody {
         device: &wgpu::Device,
         name: &str,
         radius: f32,
-        model: crate::orbital::OrbitalModel,
-        texture: texture::Texture,
+        model: OrbitalModel,
+        texture: Texture,
         model_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         tracing::debug!(name, radius, "creating celestial body");
-        let mesh = mesh::Mesh::sphere(device, 128, 64);
+        let mesh = Mesh::sphere(device, 128, 64);
 
         let normals_vertices: Vec<ColorVertex> = mesh
             .vertices
@@ -92,7 +99,7 @@ impl CelestialBody {
             model,
         };
 
-        let model_uniform = ModelUniform::new(&glam::Mat4::IDENTITY, &glam::Mat4::IDENTITY, radius);
+        let model_uniform = ModelUniform::new(&Mat4::IDENTITY, &Mat4::IDENTITY, radius);
 
         let model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("{} Model Buffer", name)),
@@ -116,8 +123,8 @@ impl CelestialBody {
             normals_mesh,
             radius,
             orbital_parameters,
-            orbital_transform: glam::Mat4::IDENTITY,
-            spin_transform: glam::Mat4::IDENTITY,
+            orbital_transform: Mat4::IDENTITY,
+            spin_transform: Mat4::IDENTITY,
             model_uniform,
             model_buffer,
             model_bind_group,
@@ -125,30 +132,29 @@ impl CelestialBody {
     }
 
     pub fn update(&mut self, sim_time: f64) {
-        use crate::orbital::OrbitalModel;
         let pos = match self.orbital_parameters.model {
-            OrbitalModel::Fixed => glam::Vec3::ZERO,
+            OrbitalModel::Fixed => Vec3::ZERO,
             OrbitalModel::Parametric {
                 radius,
                 angular_velocity,
             } => {
                 let angle = angular_velocity * sim_time as f32;
-                glam::Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin())
+                Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin())
             }
-            OrbitalModel::Vsop87 { body } => crate::orbital::heliocentric_position(body, sim_time),
+            OrbitalModel::Vsop87 { body } => orbital::heliocentric_position(body, sim_time),
         };
-        self.orbital_transform = glam::Mat4::from_translation(pos);
-        self.spin_transform = glam::Mat4::from_rotation_y(0.1 * sim_time as f32);
+        self.orbital_transform = Mat4::from_translation(pos);
+        self.spin_transform = Mat4::from_rotation_y(0.1 * sim_time as f32);
     }
 
     /// Update the model uniform based on its absolute world transform (i.e. combined with parent transforms) and its spin transform
-    pub fn update_model_uniform(&mut self, world_transform: glam::Mat4) {
+    pub fn update_model_uniform(&mut self, world_transform: Mat4) {
         self.model_uniform = ModelUniform::new(&world_transform, &self.spin_transform, self.radius);
     }
 
     /// Rebuild the sphere mesh and normals overlay with new tessellation parameters.
     pub fn rebuild_mesh(&mut self, device: &wgpu::Device, meridians: u32, parallels: u32) {
-        let new_mesh = mesh::Mesh::sphere(device, meridians, parallels);
+        let new_mesh = Mesh::sphere(device, meridians, parallels);
         let normals_vertices: Vec<ColorVertex> = new_mesh
             .vertices
             .iter()
@@ -181,7 +187,7 @@ pub trait DrawCelestialBody<'a> {
     fn draw_celestial_body_instanced(
         &mut self,
         cb: &'a CelestialBody,
-        instances: std::ops::Range<u32>,
+        instances: Range<u32>,
         camera_bind_group: &wgpu::BindGroup,
     );
 }
@@ -193,7 +199,7 @@ impl<'a, 'b: 'a> DrawCelestialBody<'b> for wgpu::RenderPass<'a> {
     fn draw_celestial_body_instanced(
         &mut self,
         cb: &'b CelestialBody,
-        instances: std::ops::Range<u32>,
+        instances: Range<u32>,
         camera_bind_group: &wgpu::BindGroup,
     ) {
         self.set_vertex_buffer(0, cb.mesh.vertex_buffer.slice(..));

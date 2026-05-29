@@ -1,6 +1,4 @@
-use crate::grid::ColorVertex;
-use crate::mesh::Vertex;
-use crate::{loader, shader_loader, texture};
+use crate::{grid::ColorVertex, loader, mesh::Vertex, shader_loader, texture::Texture};
 
 /// All render pipelines used by the main scene draw pass: the textured fill
 /// pipeline for celestial bodies, its wireframe twin, and the unlit grid
@@ -209,7 +207,7 @@ fn build_main_pipelines(
                 conservative: false,
             },
             depth_stencil: Some(wgpu::DepthStencilState {
-                format: texture::Texture::DEPTH_FORMAT,
+                format: Texture::DEPTH_FORMAT,
                 depth_write_enabled: Some(true),
                 depth_compare: Some(wgpu::CompareFunction::Less),
                 stencil: wgpu::StencilState::default(),
@@ -276,7 +274,7 @@ fn build_normals_pipeline(
             conservative: false,
         },
         depth_stencil: Some(wgpu::DepthStencilState {
-            format: texture::Texture::DEPTH_FORMAT,
+            format: Texture::DEPTH_FORMAT,
             depth_write_enabled: Some(true),
             depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: wgpu::StencilState::default(),
@@ -327,7 +325,7 @@ fn build_grid_pipeline(
             conservative: false,
         },
         depth_stencil: Some(wgpu::DepthStencilState {
-            format: texture::Texture::DEPTH_FORMAT,
+            format: Texture::DEPTH_FORMAT,
             depth_write_enabled: Some(true),
             depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: wgpu::StencilState::default(),

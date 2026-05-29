@@ -3,7 +3,7 @@ use std::sync::Arc;
 use miette::IntoDiagnostic;
 use winit::window::Window;
 
-use crate::texture;
+use crate::Texture;
 
 /// Window-bound wgpu plumbing: instance/adapter/device/queue plus the swapchain
 /// surface and its companion depth buffer.
@@ -25,7 +25,7 @@ pub struct GpuContext {
     /// The window the surface is bound to.
     pub window: Arc<Window>,
     /// Depth texture matching the current swapchain size; recreated on resize.
-    pub depth_texture: texture::Texture,
+    pub depth_texture: Texture,
 }
 
 impl GpuContext {
@@ -115,8 +115,7 @@ impl GpuContext {
             desired_maximum_frame_latency: 2,
         };
 
-        let depth_texture =
-            texture::Texture::create_depth_texture(&device, &config, "depth_texture");
+        let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
 
         Ok(Self {
             surface,
@@ -142,7 +141,7 @@ impl GpuContext {
         self.config.height = height.min(max_dim);
         self.surface.configure(&self.device, &self.config);
         self.depth_texture =
-            texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
+            Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
         self.is_surface_configured = true;
     }
 }

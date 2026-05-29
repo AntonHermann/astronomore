@@ -1,4 +1,6 @@
 use std::f32::consts::FRAC_PI_2;
+
+use glam::{Mat4, Vec3, Vec4};
 use web_time::Duration;
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalPosition;
@@ -8,11 +10,11 @@ use winit::keyboard::KeyCode;
 use crate::scene::{BodyId, Scene};
 
 #[rustfmt::skip]
-const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols(
-    glam::Vec4::new(1.0, 0.0, 0.0, 0.0),
-    glam::Vec4::new(0.0, 1.0, 0.0, 0.0),
-    glam::Vec4::new(0.0, 0.0, 0.5, 0.0),
-    glam::Vec4::new(0.0, 0.0, 0.5, 1.0),
+const OPENGL_TO_WGPU_MATRIX: Mat4 = Mat4::from_cols(
+    Vec4::new(1.0, 0.0, 0.0, 0.0),
+    Vec4::new(0.0, 1.0, 0.0, 0.0),
+    Vec4::new(0.0, 0.0, 0.5, 0.0),
+    Vec4::new(0.0, 0.0, 0.5, 1.0),
 );
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 
@@ -23,7 +25,7 @@ pub enum Camera {
 }
 impl Camera {
     #[allow(dead_code)]
-    pub fn new_fps(position: impl Into<glam::Vec3>, yaw_rad: f32, pitch_rad: f32) -> Self {
+    pub fn new_fps(position: impl Into<Vec3>, yaw_rad: f32, pitch_rad: f32) -> Self {
         Self::Fps(FpsCamera::new(position, yaw_rad, pitch_rad))
     }
     #[allow(dead_code)]
@@ -33,7 +35,7 @@ impl Camera {
 
     /// Calculate the view matrix for this camera. This is the transform that transforms world space to camera space.
     /// For `Orbit` cameras, `orbit_target` must be `Some(world_pos_of_target_body)`.
-    pub fn world_to_cam_matrix(&self, orbit_target: Option<glam::Vec3>) -> glam::Mat4 {
+    pub fn world_to_cam_matrix(&self, orbit_target: Option<Vec3>) -> Mat4 {
         match self {
             Camera::Fps(camera) => camera.world_to_cam_matrix(),
             Camera::Orbit(camera) => camera.world_to_cam_matrix(
@@ -43,7 +45,7 @@ impl Camera {
     }
 
     /// Returns the position of the camera in world space.
-    pub fn position(&self, orbit_target: Option<glam::Vec3>) -> glam::Vec3 {
+    pub fn position(&self, orbit_target: Option<Vec3>) -> Vec3 {
         match self {
             Camera::Fps(cam) => cam.position,
             Camera::Orbit(cam) => {
@@ -54,12 +56,12 @@ impl Camera {
 
     /// Returns the world-space position of this camera's orbit target,
     /// or `None` if this is not an orbit camera.
-    pub fn orbit_target(&self, scene: &Scene) -> Option<glam::Vec3> {
+    pub fn orbit_target(&self, scene: &Scene) -> Option<Vec3> {
         match self {
             Camera::Orbit(c) => Some(
                 scene
                     .get_body_orbital_transform(c.target)
-                    .transform_point3(glam::Vec3::ZERO),
+                    .transform_point3(Vec3::ZERO),
             ),
             _ => None,
         }
@@ -69,13 +71,13 @@ impl Camera {
 #[derive(Debug, Clone)]
 pub struct FpsCamera {
     /// Position of the camera in world space.
-    pub position: glam::Vec3,
+    pub position: Vec3,
     pub yaw_rad: f32,
     pub pitch_rad: f32,
 }
 
 impl FpsCamera {
-    pub fn new(position: impl Into<glam::Vec3>, yaw_rad: f32, pitch_rad: f32) -> Self {
+    pub fn new(position: impl Into<Vec3>, yaw_rad: f32, pitch_rad: f32) -> Self {
         Self {
             position: position.into(),
             yaw_rad,
@@ -84,13 +86,13 @@ impl FpsCamera {
     }
 
     /// Calculate the view matrix for this camera. This is the transform that transforms world space to camera space.
-    pub fn world_to_cam_matrix(&self) -> glam::Mat4 {
+    pub fn world_to_cam_matrix(&self) -> Mat4 {
         let (sin_pitch, cos_pitch) = self.pitch_rad.sin_cos();
         let (sin_yaw, cos_yaw) = self.yaw_rad.sin_cos();
-        glam::Mat4::look_to_rh(
+        Mat4::look_to_rh(
             self.position,
-            glam::Vec3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw).normalize(),
-            glam::Vec3::Y,
+            Vec3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw).normalize(),
+            Vec3::Y,
         )
     }
 }
@@ -116,24 +118,24 @@ impl OrbitCamera {
     }
 
     /// Transform from `target` to `camera` (world space)
-    pub fn relative_camera_transform(&self) -> glam::Mat4 {
+    pub fn relative_camera_transform(&self) -> Mat4 {
         // Negate pitch so positive pitch lifts the camera above the target (elevation convention).
-        let camera_rotation = glam::Mat4::from_rotation_y(self.yaw_rad)
-            * glam::Mat4::from_rotation_x(-self.pitch_rad);
-        let camera_translation = glam::Mat4::from_translation(glam::Vec3::new(0.0, 0.0, self.dist));
+        let camera_rotation =
+            Mat4::from_rotation_y(self.yaw_rad) * Mat4::from_rotation_x(-self.pitch_rad);
+        let camera_translation = Mat4::from_translation(Vec3::new(0.0, 0.0, self.dist));
         camera_rotation * camera_translation
     }
 
     /// Returns the position of the camera in world space.
-    pub fn position(&self, target_pos: glam::Vec3) -> glam::Vec3 {
+    pub fn position(&self, target_pos: Vec3) -> Vec3 {
         let rel_camera_transform = self.relative_camera_transform();
         rel_camera_transform.transform_point3(target_pos)
     }
 
     /// Calculate the view matrix for this camera. This is the transform that transforms world space to camera space.
-    pub fn world_to_cam_matrix(&self, target_pos: glam::Vec3) -> glam::Mat4 {
+    pub fn world_to_cam_matrix(&self, target_pos: Vec3) -> Mat4 {
         let camera_pos = self.position(target_pos);
-        glam::Mat4::look_at_rh(camera_pos, target_pos, glam::Vec3::Y)
+        Mat4::look_at_rh(camera_pos, target_pos, Vec3::Y)
     }
 }
 
@@ -161,9 +163,9 @@ impl Projection {
     /// Calculate the projection matrix that transforms camera space to clip space.
     /// Combines a right-handed perspective projection with `OPENGL_TO_WGPU_MATRIX`
     /// to remap OpenGL's `[-1, 1]` z-range to wgpu's `[0, 1]` convention.
-    pub fn cam_to_clip_matrix(&self) -> glam::Mat4 {
+    pub fn cam_to_clip_matrix(&self) -> Mat4 {
         OPENGL_TO_WGPU_MATRIX
-            * glam::Mat4::perspective_rh(self.fov_y_rad, self.aspect_ratio, self.z_near, self.z_far)
+            * Mat4::perspective_rh(self.fov_y_rad, self.aspect_ratio, self.z_near, self.z_far)
     }
 }
 
@@ -291,8 +293,8 @@ impl CameraController {
             Camera::Fps(camera) => {
                 // Move forward/backward and left/right
                 let (yaw_sin, yaw_cos) = camera.yaw_rad.sin_cos();
-                let forward = glam::Vec3::new(yaw_cos, 0.0, yaw_sin).normalize();
-                let right = glam::Vec3::new(-yaw_sin, 0.0, yaw_cos).normalize();
+                let forward = Vec3::new(yaw_cos, 0.0, yaw_sin).normalize();
+                let right = Vec3::new(-yaw_sin, 0.0, yaw_cos).normalize();
                 camera.position += forward * (forward_amt - backward_amt) * self.speed * dt;
                 camera.position += right * (right_amt - left_amt) * self.speed * dt;
 
@@ -302,8 +304,7 @@ impl CameraController {
                 // to get closer to an object you want to focus on.
                 let (pitch_sin, pitch_cos) = camera.pitch_rad.sin_cos();
                 let scrollward =
-                    glam::Vec3::new(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin)
-                        .normalize();
+                    Vec3::new(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin).normalize();
                 camera.position +=
                     scrollward * self.scroll * self.speed * self.zoom_sensitivity * dt;
                 self.scroll = 0.0;
@@ -366,7 +367,7 @@ impl CameraUniform {
     /// Identity matrix; overwritten on the first `update_view_proj` call.
     pub fn new() -> Self {
         Self {
-            view_proj: glam::Mat4::IDENTITY.to_cols_array_2d(),
+            view_proj: Mat4::IDENTITY.to_cols_array_2d(),
             camera_pos: [0f32; 3],
             _padding: 0.0,
         }
@@ -378,7 +379,7 @@ impl CameraUniform {
             Camera::Orbit(c) => Some(
                 scene
                     .get_body_orbital_transform(c.target)
-                    .transform_point3(glam::Vec3::ZERO),
+                    .transform_point3(Vec3::ZERO),
             ),
             _ => None,
         };

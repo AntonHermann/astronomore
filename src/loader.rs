@@ -1,7 +1,8 @@
+use miette::IntoDiagnostic;
+
 /// Loads a UTF-8 text file from a path (native) or URL (WASM).
 #[tracing::instrument(err)]
 pub async fn load_str(path: &str) -> miette::Result<String> {
-    use miette::IntoDiagnostic;
     let bytes = load_bytes(path).await?;
     String::from_utf8(bytes).into_diagnostic()
 }
@@ -14,7 +15,6 @@ pub async fn load_str(path: &str) -> miette::Result<String> {
 pub async fn load_bytes(path: &str) -> miette::Result<Vec<u8>> {
     #[cfg(not(target_arch = "wasm32"))]
     {
-        use miette::IntoDiagnostic;
         std::fs::read(path)
             .into_diagnostic()
             .inspect(|v| tracing::debug!(len = v.len(), "asset loaded"))

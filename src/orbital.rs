@@ -1,3 +1,5 @@
+use glam::Vec3;
+
 /// Scale factor: 1 astronomical unit = `AU_TO_SCENE` scene units.
 ///
 /// Earth's semi-major axis (1 AU) maps to 10 scene units, consistent with the
@@ -96,7 +98,7 @@ pub fn jde_to_gregorian(jde: f64) -> (i32, u8, u8) {
 /// scene_y = vsop87_z * AU_TO_SCENE   (ecliptic north → scene up)
 /// scene_z = vsop87_y * AU_TO_SCENE
 /// ```
-pub fn heliocentric_position(body: Vsop87Body, sim_time_s: f64) -> glam::Vec3 {
+pub fn heliocentric_position(body: Vsop87Body, sim_time_s: f64) -> Vec3 {
     let jde = sim_time_to_jde(sim_time_s);
     let c = match body {
         Vsop87Body::Mercury => vsop87::vsop87a::mercury(jde),
@@ -109,7 +111,7 @@ pub fn heliocentric_position(body: Vsop87Body, sim_time_s: f64) -> glam::Vec3 {
         Vsop87Body::Uranus => vsop87::vsop87a::uranus(jde),
         Vsop87Body::Neptune => vsop87::vsop87a::neptune(jde),
     };
-    glam::Vec3::new(
+    Vec3::new(
         (c.x * AU_TO_SCENE) as f32,
         (c.z * AU_TO_SCENE) as f32,
         (c.y * AU_TO_SCENE) as f32,
