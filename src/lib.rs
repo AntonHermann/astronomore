@@ -41,12 +41,13 @@ use winit::platform::web::EventLoopExtWebSys;
 
 use crate::{
     camera::{Camera, CameraRig},
-    celestial_body::{DrawCelestialBody, DrawCelestialBodyNormals},
+    celestial_body::DrawCelestialBodyNormals,
     gpu::GpuContext,
     grid::{DrawGrid, GridMesh},
     mesh::DrawMesh,
     pipelines::Pipelines,
     planets::SolarSystemBody,
+    scene::DrawScene,
     scene_properties::SceneProperties,
     sim::SimState,
     ui::{EguiLayer, ViewOptions},
@@ -305,15 +306,12 @@ impl State {
                 render_pass.draw_mesh(mesh);
             }
 
-            // TODO: move this logic into the scene and/or celestial body
-            tracing::trace!(
-                count = self.scene.celestial_bodies.len(),
-                "draw celestial bodies"
+            tracing::trace!("draw scene");
+            render_pass.draw_scene(
+                &self.scene,
+                &self.camera_rig.bind_group,
+                &self.scene_properties.bind_group,
             );
-            for planet in &self.scene.celestial_bodies {
-                tracing::trace!(name = planet.name, "draw body");
-                render_pass.draw_celestial_body(planet, &self.camera_rig.bind_group);
-            }
 
             if self.view.show_normals {
                 tracing::trace!("set pipeline: normals");

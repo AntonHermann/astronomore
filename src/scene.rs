@@ -1,4 +1,4 @@
-use crate::celestial_body::CelestialBody;
+use crate::celestial_body::{CelestialBody, DrawCelestialBody};
 
 /// Index of a celestial body in the scene's celestial_bodies list.
 /// Can only be constructed by the scene when adding a celestial body, and is used to reference celestial bodies (e.g. as parents in orbital parameters) without exposing the internal list structure of the scene.
@@ -110,5 +110,33 @@ impl Scene {
             curr_id = parent_id;
         }
         orbital_transform
+    }
+}
+
+pub trait DrawScene<'a>: DrawCelestialBody<'a> {
+    fn draw_scene(
+        &mut self,
+        scene: &'a Scene,
+        camera_bind_group: &wgpu::BindGroup,
+        scene_properties_bind_group: &wgpu::BindGroup,
+    );
+}
+impl<'a, 'b: 'a> DrawScene<'b> for wgpu::RenderPass<'a> {
+    fn draw_scene(
+        &mut self,
+        scene: &'b Scene,
+        camera_bind_group: &wgpu::BindGroup,
+        scene_properties_bind_group: &wgpu::BindGroup,
+    ) {
+        self.set_bind_group(3, scene_properties_bind_group, &[]);
+
+        tracing::trace!(
+            count = scene.celestial_bodies.len(),
+            "draw celestial bodies"
+        );
+        for cb in &scene.celestial_bodies {
+            tracing::trace!(name = cb.name, "draw body");
+            self.draw_celestial_body(cb, camera_bind_group);
+        }
     }
 }
