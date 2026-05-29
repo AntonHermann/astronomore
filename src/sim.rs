@@ -1,3 +1,5 @@
+use crate::orbital;
+
 /// Simulation clock and time controls.
 ///
 /// `time` advances with the wall clock when not paused, scaled by `multiplier`.
@@ -64,18 +66,17 @@ impl SimState {
 
     /// Returns how many simulation days pass for every second in real/wall-clock time.
     pub const fn sim_days_per_clock_sec(&self) -> f64 {
-        self.multiplier / crate::orbital::SEC_PER_DAY
+        self.multiplier / orbital::SEC_PER_DAY
     }
 
     /// Jump simulation time to midnight (0:00 UT) of the given Gregorian date.
     pub fn jump_to_date(&mut self, year: i32, month: u8, day: u8) {
-        self.time =
-            crate::orbital::jde_to_sim_time(crate::orbital::gregorian_to_jde(year, month, day));
+        self.time = orbital::jde_to_sim_time(orbital::gregorian_to_jde(year, month, day));
     }
 
     /// Set sim time so that for every wall clock second, the sim time advances by `days`.
     pub fn set_sim_days_per_sec(&mut self, days: f64) {
-        self.multiplier = crate::orbital::SEC_PER_DAY * days;
+        self.multiplier = orbital::SEC_PER_DAY * days;
         tracing::info!(
             "Sim time mult: {}x ({} days/s)",
             self.multiplier,

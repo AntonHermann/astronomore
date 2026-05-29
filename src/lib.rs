@@ -23,6 +23,7 @@ pub use texture::Texture;
 
 use std::sync::Arc;
 
+use glam::{Vec3, Vec4};
 use miette::IntoDiagnostic;
 use wgpu::util::DeviceExt;
 use winit::{
@@ -38,13 +39,17 @@ use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::EventLoopExtWebSys;
 
-use crate::grid::{DrawGrid, GridMesh};
-use crate::mesh::DrawMesh;
 use crate::{
     camera::{Camera, CameraRig},
     celestial_body::{DrawCelestialBody, DrawCelestialBodyNormals},
     gpu::GpuContext,
+    grid::{DrawGrid, GridMesh},
+    mesh::DrawMesh,
     pipelines::Pipelines,
+    planets::SolarSystemBody,
+    scene_properties::SceneProperties,
+    sim::SimState,
+    ui::{EguiLayer, ViewOptions},
 };
 
 pub struct State {
@@ -55,16 +60,16 @@ pub struct State {
     grid_xz: GridMesh,
     grid_xy: GridMesh,
     grid_yz: GridMesh,
-    view: ui::ViewOptions,
-    meshes: Vec<mesh::Mesh>,
-    diffuse_texture: texture::Texture,
+    view: ViewOptions,
+    meshes: Vec<Mesh>,
+    diffuse_texture: Texture,
     // diffuse_bind_group: wgpu::BindGroup,
     identity_model_bind_group: wgpu::BindGroup,
-    scene: scene::Scene,
-    scene_properties: scene_properties::SceneProperties,
-    sim: sim::SimState,
+    scene: Scene,
+    scene_properties: SceneProperties,
+    sim: SimState,
     camera_rig: CameraRig,
-    ui: ui::EguiLayer,
+    ui: EguiLayer,
 }
 
 impl State {
@@ -76,9 +81,9 @@ impl State {
         let surface_format = config.format;
         let size = winit::dpi::PhysicalSize::new(config.width, config.height);
 
-        let texture_bind_group_layout = texture::Texture::bind_group_layout(device);
+        let texture_bind_group_layout = Texture::bind_group_layout(device);
         let diffuse_bytes = loader::load_bytes("assets/textures/dbg.png").await?;
-        let diffuse_texture = texture::Texture::from_bytes(
+        let diffuse_texture = Texture::from_bytes(
             device,
             queue,
             &diffuse_bytes,
@@ -87,17 +92,12 @@ impl State {
         )?;
 
         // ==================== Scene setup =====================
-        let mut scene = scene::Scene::new(device);
-        let mut body_ids: Vec<scene::BodyId> = Vec::with_capacity(planets::BODIES.len());
+        let mut scene = Scene::new(device);
+        let mut body_ids: Vec<BodyId> = Vec::with_capacity(planets::BODIES.len());
         for def in planets::BODIES {
             let bytes = loader::load_bytes(def.texture_path).await?;
-            let texture = texture::Texture::from_bytes(
-                device,
-                queue,
-                &bytes,
-                def.name,
-                &texture_bind_group_layout,
-            )?;
+            let texture =
+                Texture::from_bytes(device, queue, &bytes, def.name, &texture_bind_group_layout)?;
             let parent_id = def.parent.map(|p| body_ids[p as usize]);
             let id = scene.add_celestial_body(
                 CelestialBody::new(
@@ -112,7 +112,7 @@ impl State {
             );
             body_ids.push(id);
         }
-        let sun_id = body_ids[planets::SolarSystemBody::Sun as usize];
+        let sun_id = body_ids[SolarSystemBody::Sun as usize];
 
         // ======= Camera setup =======
         // let initial_camera =
@@ -121,7 +121,7 @@ impl State {
         let camera_rig = CameraRig::new(device, size.width, size.height, initial_camera, &scene);
 
         // ================= Scene properties =================
-        let scene_properties = scene_properties::SceneProperties::new(device);
+        let scene_properties = SceneProperties::new(device);
 
         // ================= Pipelines =================
         let pipelines = Pipelines::new(
@@ -153,10 +153,10 @@ impl State {
             label: Some("Identity Model Bind Group"),
         });
         let meshes = vec![
-            // mesh::Mesh::default_sphere(&device),
-            // mesh::Mesh::x_plane(&device),
-            // mesh::Mesh::y_plane(&device),
-            // mesh::Mesh::z_plane(&device),
+            // Mesh::default_sphere(&device),
+            // Mesh::x_plane(&device),
+            // Mesh::y_plane(&device),
+            // Mesh::z_plane(&device),
         ];
 
         // ==================== egui setup ====================
@@ -176,7 +176,7 @@ impl State {
             diffuse_texture,
             scene,
             scene_properties,
-            sim: sim::SimState::new(),
+            sim: SimState::new(),
             camera_rig,
             ui: ui_layer,
         })
@@ -370,7 +370,7 @@ impl State {
             ),
         };
         let cam_is_fps = matches!(&self.camera_rig.camera, Camera::Fps(_));
-        let body_list: Vec<(scene::BodyId, String)> = self
+        let body_list: Vec<(BodyId, String)> = self
             .scene
             .iter_bodies()
             .map(|(id, n)| (id, n.to_string()))
@@ -794,9 +794,8 @@ impl State {
                 let world_pos = self
                     .scene
                     .get_body_orbital_transform(*body_id)
-                    .transform_point3(glam::Vec3::ZERO);
-                let clip_pos =
-                    view_proj * glam::Vec4::new(world_pos.x, world_pos.y, world_pos.z, 1.0);
+                    .transform_point3(Vec3::ZERO);
+                let clip_pos = view_proj * Vec4::new(world_pos.x, world_pos.y, world_pos.z, 1.0);
 
                 if clip_pos.w <= 0.0 {
                     continue;
@@ -841,7 +840,7 @@ impl State {
         if mode_switched || reset_camera {
             self.camera_rig.camera = if selected_is_fps {
                 Camera::new_fps(
-                    glam::Vec3::new(0.0, 8.0, 25.0),
+                    Vec3::new(0.0, 8.0, 25.0),
                     -90f32.to_radians(),
                     -20f32.to_radians(),
                 )
@@ -853,7 +852,7 @@ impl State {
         } else {
             match &mut self.camera_rig.camera {
                 Camera::Fps(c) => {
-                    c.position = glam::Vec3::new(fps_pos_x, fps_pos_y, fps_pos_z);
+                    c.position = Vec3::new(fps_pos_x, fps_pos_y, fps_pos_z);
                     c.yaw_rad = fps_yaw_deg.to_radians();
                     c.pitch_rad = fps_pitch_deg.to_radians();
                 }
