@@ -138,3 +138,40 @@ pub const BODIES: &[BodyDef] = &[
         parent: Some(SolarSystemBody::Sun),
     },
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parent_precedes_child_in_array() {
+        // The scene relies on parents being inserted before their children, which
+        // holds iff every body's parent has a smaller discriminant (= array index).
+        for (i, def) in BODIES.iter().enumerate() {
+            if let Some(parent) = def.parent {
+                assert!(
+                    (parent as usize) < i,
+                    "{} (index {i}) has parent with index {}",
+                    def.name,
+                    parent as usize
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn discriminant_matches_array_index() {
+        // body_ids[SolarSystemBody::X as usize] indexing relies on this.
+        assert_eq!(SolarSystemBody::Sun as usize, 0);
+        assert_eq!(SolarSystemBody::Earth as usize, 3);
+        assert_eq!(SolarSystemBody::Neptune as usize, 9);
+        assert_eq!(BODIES.len(), 10);
+    }
+
+    #[test]
+    fn all_bodies_have_positive_radius() {
+        for def in BODIES {
+            assert!(def.radius > 0.0, "{} has radius {}", def.name, def.radius);
+        }
+    }
+}

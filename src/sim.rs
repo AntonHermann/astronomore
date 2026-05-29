@@ -89,3 +89,62 @@ impl Default for SimState {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use web_time::Duration;
+
+    #[test]
+    fn advance_scales_by_multiplier() {
+        let mut s = SimState::new();
+        s.multiplier = 2.0;
+        s.advance(Duration::from_secs(1));
+        assert!((s.time - 2.0).abs() < 1e-9, "time = {}", s.time);
+    }
+
+    #[test]
+    fn advance_is_noop_when_paused() {
+        let mut s = SimState::new();
+        s.is_paused = true;
+        s.advance(Duration::from_secs(5));
+        assert_eq!(s.time, 0.0);
+    }
+
+    #[test]
+    fn toggle_pause_flips_flag() {
+        let mut s = SimState::new();
+        assert!(!s.is_paused);
+        s.toggle_pause();
+        assert!(s.is_paused);
+        s.toggle_pause();
+        assert!(!s.is_paused);
+    }
+
+    #[test]
+    fn speed_controls() {
+        let mut s = SimState::new();
+        s.double_speed();
+        s.double_speed();
+        assert_eq!(s.multiplier, 4.0);
+        s.halve_speed();
+        assert_eq!(s.multiplier, 2.0);
+        s.reset_speed();
+        assert_eq!(s.multiplier, 1.0);
+    }
+
+    #[test]
+    fn jump_to_date_round_trips() {
+        let mut s = SimState::new();
+        s.jump_to_date(2026, 5, 29);
+        let jde = crate::orbital::sim_time_to_jde(s.time);
+        assert_eq!(crate::orbital::jde_to_gregorian(jde), (2026, 5, 29));
+    }
+
+    #[test]
+    fn set_sim_days_per_sec_matches_readback() {
+        let mut s = SimState::new();
+        s.set_sim_days_per_sec(30.0);
+        assert!((s.sim_days_per_clock_sec() - 30.0).abs() < 1e-9);
+    }
+}

@@ -115,3 +115,75 @@ pub fn heliocentric_position(body: Vsop87Body, sim_time_s: f64) -> glam::Vec3 {
         (c.y * AU_TO_SCENE) as f32,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- Julian date / sim time conversions ---
+
+    #[test]
+    fn sim_time_zero_is_j2000() {
+        assert_eq!(sim_time_to_jde(0.0), J2000_JDE);
+    }
+
+    #[test]
+    fn jde_sim_time_round_trip() {
+        for t in [0.0, 1.0, SEC_PER_DAY, -SEC_PER_DAY, 1.5e9] {
+            let back = jde_to_sim_time(sim_time_to_jde(t));
+            assert!((back - t).abs() < 1e-3, "t={t} -> {back}");
+        }
+    }
+
+    #[test]
+    fn gregorian_to_jde_known_values() {
+        // Meeus, Astronomical Algorithms: 2000-01-01 0:00 UT = JD 2451544.5
+        assert!((gregorian_to_jde(2000, 1, 1) - 2_451_544.5).abs() < 1e-6);
+        // 1957-10-04 0:00 UT (Sputnik launch date) = JD 2436115.5
+        // (Meeus cites Oct 4.81 = JD 2436116.31, so 0:00 UT is 0.81 earlier)
+        assert!((gregorian_to_jde(1957, 10, 4) - 2_436_115.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn gregorian_jde_round_trip() {
+        let dates = [
+            (2000, 1, 1),
+            (1999, 12, 31),
+            (2026, 5, 29),
+            (1900, 1, 1),
+            (2100, 2, 28),
+            (1582, 10, 15), // first day of the Gregorian calendar
+        ];
+        for (y, m, d) in dates {
+            let jde = gregorian_to_jde(y, m, d);
+            let (ry, rm, rd) = jde_to_gregorian(jde);
+            assert_eq!((ry, rm, rd), (y, m, d), "round trip failed for {y}-{m}-{d}");
+        }
+    }
+
+    // --- VSOP87 heliocentric positions ---
+
+    #[test]
+    fn earth_is_about_one_au_from_sun() {
+        // At J2000 Earth sits near perihelion (~0.983 AU).
+        let pos = heliocentric_position(Vsop87Body::Earth, 0.0);
+        let au = pos.length() as f64 / AU_TO_SCENE;
+        assert!((0.97..1.02).contains(&au), "earth distance = {au} AU");
+    }
+
+    #[test]
+    fn earth_stays_near_ecliptic_plane() {
+        // Earth defines the ecliptic, so its scene-Y (ecliptic latitude) is ~0.
+        let pos = heliocentric_position(Vsop87Body::Earth, 0.0);
+        assert!(pos.y.abs() < 0.01, "earth scene-y = {}", pos.y);
+    }
+
+    #[test]
+    fn outer_planets_are_farther_than_inner() {
+        let mercury = heliocentric_position(Vsop87Body::Mercury, 0.0).length();
+        let earth = heliocentric_position(Vsop87Body::Earth, 0.0).length();
+        let jupiter = heliocentric_position(Vsop87Body::Jupiter, 0.0).length();
+        assert!(mercury < earth, "mercury {mercury} !< earth {earth}");
+        assert!(earth < jupiter, "earth {earth} !< jupiter {jupiter}");
+    }
+}

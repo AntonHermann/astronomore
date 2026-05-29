@@ -543,7 +543,11 @@ mod tests {
         let mut ctrl = make_ctrl();
         ctrl.handle_key(KeyCode::Space, ElementState::Pressed);
         let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
-        assert!(cam.position.y > 0.0, "expected y > 0, got {}", cam.position.y);
+        assert!(
+            cam.position.y > 0.0,
+            "expected y > 0, got {}",
+            cam.position.y
+        );
     }
 
     #[test]
@@ -551,7 +555,11 @@ mod tests {
         let mut ctrl = make_ctrl();
         ctrl.handle_key(KeyCode::ShiftLeft, ElementState::Pressed);
         let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
-        assert!(cam.position.y < 0.0, "expected y < 0, got {}", cam.position.y);
+        assert!(
+            cam.position.y < 0.0,
+            "expected y < 0, got {}",
+            cam.position.y
+        );
     }
 
     #[test]
@@ -569,7 +577,11 @@ mod tests {
         let mut ctrl = make_ctrl();
         ctrl.handle_key(KeyCode::KeyW, ElementState::Pressed);
         let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
-        assert!(cam.position.x > 0.0, "expected x > 0, got {}", cam.position.x);
+        assert!(
+            cam.position.x > 0.0,
+            "expected x > 0, got {}",
+            cam.position.x
+        );
         assert_eq!(cam.position.y, 0.0);
     }
 
@@ -579,7 +591,11 @@ mod tests {
         let mut ctrl = make_ctrl();
         ctrl.handle_key(KeyCode::KeyS, ElementState::Pressed);
         let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
-        assert!(cam.position.x < 0.0, "expected x < 0, got {}", cam.position.x);
+        assert!(
+            cam.position.x < 0.0,
+            "expected x < 0, got {}",
+            cam.position.x
+        );
     }
 
     #[test]
@@ -587,7 +603,11 @@ mod tests {
         let mut ctrl = make_ctrl();
         ctrl.handle_key(KeyCode::ArrowUp, ElementState::Pressed);
         let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
-        assert!(cam.position.x > 0.0, "expected x > 0, got {}", cam.position.x);
+        assert!(
+            cam.position.x > 0.0,
+            "expected x > 0, got {}",
+            cam.position.x
+        );
     }
 
     #[test]
@@ -596,7 +616,11 @@ mod tests {
         let mut ctrl = make_ctrl();
         ctrl.touch.forward = 1.0;
         let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
-        assert!(cam.position.x > 0.0, "expected x > 0, got {}", cam.position.x);
+        assert!(
+            cam.position.x > 0.0,
+            "expected x > 0, got {}",
+            cam.position.x
+        );
     }
 
     #[test]
@@ -613,7 +637,11 @@ mod tests {
         let mut ctrl = make_ctrl();
         ctrl.handle_mouse(0.0, 5.0);
         let cam = step_fps(&mut ctrl, FpsCamera::new(Vec3::ZERO, 0.0, 0.0));
-        assert!(cam.pitch_rad < 0.0, "expected pitch < 0, got {}", cam.pitch_rad);
+        assert!(
+            cam.pitch_rad < 0.0,
+            "expected pitch < 0, got {}",
+            cam.pitch_rad
+        );
     }
 
     #[test]
