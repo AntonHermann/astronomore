@@ -111,6 +111,7 @@ just san        # cargo fmt + clippy -D warnings
 | N | Normalenvisualisierung umschalten |
 | L | Körper-Namen-Labels umschalten |
 | V | Debug-Pfeile (Velocity/Radial/Spin) umschalten |
+| I | Off-Screen-Indikatoren (Randpfeile zu nicht sichtbaren Körpern) umschalten |
 | G | Alle Gitter umschalten |
 | Escape | Beenden |
 

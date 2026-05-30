@@ -35,6 +35,8 @@ pub struct ViewOptions {
     pub arrows_spin: bool,
     /// Background clear color (RGB, linear).
     pub background_color: [f32; 3],
+    /// Show edge arrows pointing toward off-screen bodies.
+    pub show_offscreen_indicators: bool,
     /// Brightness multiplier for all line geometry (grids and arrows), 0–2.
     pub line_brightness: f32,
 }
@@ -59,6 +61,7 @@ impl ViewOptions {
             arrows_radial: true,
             arrows_spin: true,
             background_color: [0.0, 0.0, 0.0],
+            show_offscreen_indicators: true,
             line_brightness: 1.0,
         }
     }
@@ -99,6 +102,12 @@ impl ViewOptions {
     pub fn toggle_arrows(&mut self) {
         self.show_arrows = !self.show_arrows;
         tracing::info!("Debug arrows: {}", self.show_arrows);
+    }
+
+    /// Flip the off-screen body indicators flag.
+    pub fn toggle_offscreen_indicators(&mut self) {
+        self.show_offscreen_indicators = !self.show_offscreen_indicators;
+        tracing::info!("Off-screen indicators: {}", self.show_offscreen_indicators);
     }
 }
 
