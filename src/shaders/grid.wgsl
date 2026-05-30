@@ -4,8 +4,10 @@ struct CameraUniform {
 @group(0) @binding(0)
 var<uniform> camera: CameraUniform;
 
+// vec4 rather than f32 so the UBO is 16 bytes — required by some WebGL2/Metal drivers.
+// Only .x is used; Rust writes [brightness, 0, 0, 0].
 @group(1) @binding(0)
-var<uniform> brightness: f32;
+var<uniform> brightness_vec: vec4<f32>;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -27,5 +29,5 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(in.color.rgb * brightness, in.color.a);
+    return vec4<f32>(in.color.rgb * brightness_vec.x, in.color.a);
 }
