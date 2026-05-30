@@ -87,6 +87,15 @@ impl State {
         let surface_format = config.format;
         let size = winit::dpi::PhysicalSize::new(config.width, config.height);
 
+        // Log GPU errors to the browser console before panicking so the driver's
+        // error string (e.g., the GLSL compile log) is visible in DevTools.
+        #[cfg(target_arch = "wasm32")]
+        device.on_uncaptured_error(std::sync::Arc::new(|error: wgpu::Error| {
+            let msg = format!("wgpu GPU error: {error}");
+            wgpu::web_sys::console::error_1(&msg.as_str().into());
+            panic!("{msg}");
+        }));
+
         let texture_bind_group_layout = Texture::bind_group_layout(device);
         let diffuse_bytes = loader::load_bytes("assets/textures/dbg.png").await?;
         let diffuse_texture = Texture::from_bytes(
