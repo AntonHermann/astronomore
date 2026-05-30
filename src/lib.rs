@@ -449,6 +449,7 @@ impl State {
         };
         let prev_meridians = self.view.sphere_meridians;
         let prev_parallels = self.view.sphere_parallels;
+        let ui_scale = self.view.ui_scale;
         let sim = &mut self.sim;
         let view = &mut self.view;
         let mut cam_speed = self.camera_rig.controller.speed;
@@ -502,6 +503,7 @@ impl State {
         let mut props = self.scene_properties.uniform;
 
         let raw_input = self.ui.state.take_egui_input(&self.gpu.window);
+        self.ui.ctx.set_pixels_per_point(ui_scale);
         self.ui.ctx.begin_pass(raw_input);
         egui::Area::new(egui::Id::new("fps_overlay"))
             .anchor(egui::Align2::LEFT_TOP, egui::Vec2::new(8.0, 8.0))
@@ -596,6 +598,17 @@ impl State {
                     ui.label("Line brightness:");
                     ui.add(
                         egui::Slider::new(&mut view.line_brightness, 0.0..=2.0).fixed_decimals(2),
+                    );
+                });
+                ui.horizontal(|ui| {
+                    ui.label("UI scale:")
+                        .on_hover_text("[ = smaller, ] = bigger");
+                    ui.add(egui::Slider::new(&mut view.ui_scale, 0.5..=4.0).fixed_decimals(2));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Label size:");
+                    ui.add(
+                        egui::Slider::new(&mut view.label_font_size, 6.0..=48.0).fixed_decimals(1),
                     );
                 });
                 ui.separator();
@@ -954,7 +967,7 @@ impl State {
                     egui::pos2(screen_x, screen_y + 8.0),
                     egui::Align2::CENTER_TOP,
                     name.as_str(),
-                    egui::FontId::proportional(13.0),
+                    egui::FontId::proportional(self.view.label_font_size),
                     egui::Color32::from_rgba_unmultiplied(255, 255, 255, 200),
                 );
             }
@@ -1196,6 +1209,10 @@ impl State {
             self.view.toggle_arrows();
         } else if code == KeyCode::KeyI && state.is_pressed() {
             self.view.toggle_offscreen_indicators();
+        } else if code == KeyCode::BracketLeft && state.is_pressed() {
+            self.view.decrease_ui_scale();
+        } else if code == KeyCode::BracketRight && state.is_pressed() {
+            self.view.increase_ui_scale();
         } else {
             self.camera_rig.controller.handle_key(code, state);
         }

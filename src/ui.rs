@@ -39,6 +39,10 @@ pub struct ViewOptions {
     pub show_offscreen_indicators: bool,
     /// Brightness multiplier for all line geometry (grids and arrows), 0–2.
     pub line_brightness: f32,
+    /// egui pixels-per-point scale factor (1.0 = native DPI, 2.0 = double size).
+    pub ui_scale: f32,
+    /// Font size for the body-name screen-space overlay labels.
+    pub label_font_size: f32,
 }
 
 impl ViewOptions {
@@ -63,6 +67,8 @@ impl ViewOptions {
             background_color: [0.0, 0.0, 0.0],
             show_offscreen_indicators: true,
             line_brightness: 1.0,
+            ui_scale: 1.0,
+            label_font_size: 14.0,
         }
     }
 
@@ -102,6 +108,18 @@ impl ViewOptions {
     pub fn toggle_arrows(&mut self) {
         self.show_arrows = !self.show_arrows;
         tracing::info!("Debug arrows: {}", self.show_arrows);
+    }
+
+    /// Decrease UI scale by 0.25, clamped to 0.5.
+    pub fn decrease_ui_scale(&mut self) {
+        self.ui_scale = (self.ui_scale - 0.25).max(0.5);
+        tracing::info!("UI scale: {:.2}", self.ui_scale);
+    }
+
+    /// Increase UI scale by 0.25, clamped to 4.0.
+    pub fn increase_ui_scale(&mut self) {
+        self.ui_scale = (self.ui_scale + 0.25).min(4.0);
+        tracing::info!("UI scale: {:.2}", self.ui_scale);
     }
 
     /// Flip the off-screen body indicators flag.
