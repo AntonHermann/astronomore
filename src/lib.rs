@@ -611,6 +611,13 @@ impl State {
                         egui::Slider::new(&mut view.label_font_size, 6.0..=48.0).fixed_decimals(1),
                     );
                 });
+                ui.horizontal(|ui| {
+                    ui.label("Offscreen label size:");
+                    ui.add(
+                        egui::Slider::new(&mut view.offscreen_label_font_size, 6.0..=48.0)
+                            .fixed_decimals(1),
+                    );
+                });
                 ui.separator();
                 egui::CollapsingHeader::new("Scene Properties")
                     .default_open(true)
@@ -1076,7 +1083,7 @@ impl State {
                     egui::pos2(base_x - dx * LABEL_OFFSET, base_y - dy * LABEL_OFFSET),
                     egui::Align2::CENTER_CENTER,
                     name.as_str(),
-                    egui::FontId::proportional(11.0),
+                    egui::FontId::proportional(self.view.offscreen_label_font_size),
                     egui::Color32::from_rgba_unmultiplied(255, 200, 50, 200),
                 );
             }

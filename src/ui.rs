@@ -43,6 +43,8 @@ pub struct ViewOptions {
     pub ui_scale: f32,
     /// Font size for the body-name screen-space overlay labels.
     pub label_font_size: f32,
+    /// Font size for the off-screen indicator labels at the screen edge.
+    pub offscreen_label_font_size: f32,
 }
 
 impl ViewOptions {
@@ -69,6 +71,7 @@ impl ViewOptions {
             line_brightness: 1.0,
             ui_scale: 1.0,
             label_font_size: 14.0,
+            offscreen_label_font_size: 11.0,
         }
     }
 
