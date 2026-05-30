@@ -31,7 +31,17 @@ async fn fetch_bytes(url: &str) -> miette::Result<Vec<u8>> {
     use wasm_bindgen_futures::JsFuture;
 
     let window = web_sys::window().ok_or_else(|| miette::miette!("No window object"))?;
-    let response: web_sys::Response = JsFuture::from(window.fetch_with_str(url))
+
+    // Always revalidate with the server so stale cached shader files are never
+    // used after a deployment. "no-cache" sends a conditional request (ETag /
+    // Last-Modified); the server returns 304 if unchanged, otherwise the fresh
+    // body — without forcing a full download every time.
+    let opts = web_sys::RequestInit::new();
+    opts.set_cache(web_sys::RequestCache::NoCache);
+    let request = web_sys::Request::new_with_str_and_init(url, &opts)
+        .map_err(|e| miette::miette!("Request creation failed: {:?}", e))?;
+
+    let response: web_sys::Response = JsFuture::from(window.fetch_with_request(&request))
         .await
         .map_err(|e| miette::miette!("fetch failed: {:?}", e))?
         .dyn_into()
