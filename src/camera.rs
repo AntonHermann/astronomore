@@ -425,7 +425,7 @@ impl CameraRig {
         camera: Camera,
         scene: &Scene,
     ) -> Self {
-        let projection = Projection::new(width, height, 45.0f32.to_radians(), 0.1, 100.0);
+        let projection = Projection::new(width, height, 45.0f32.to_radians(), 0.1, 500.0);
 
         let mut uniform = CameraUniform::new();
         uniform.update_view_proj(&camera, &projection, scene);
