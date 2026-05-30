@@ -35,6 +35,8 @@ pub struct ViewOptions {
     pub arrows_spin: bool,
     /// Background clear color (RGB, linear).
     pub background_color: [f32; 3],
+    /// Brightness multiplier for all line geometry (grids and arrows), 0–2.
+    pub line_brightness: f32,
 }
 
 impl ViewOptions {
@@ -57,6 +59,7 @@ impl ViewOptions {
             arrows_radial: true,
             arrows_spin: true,
             background_color: [0.0, 0.0, 0.0],
+            line_brightness: 1.0,
         }
     }
 

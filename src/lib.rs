@@ -64,6 +64,8 @@ pub struct State {
     grid_xy: GridMesh,
     grid_yz: GridMesh,
     arrow_mesh: ArrowMesh,
+    line_brightness_buffer: wgpu::Buffer,
+    line_brightness_bind_group: wgpu::BindGroup,
     view: ViewOptions,
     meshes: Vec<Mesh>,
     diffuse_texture: Texture,
@@ -143,6 +145,20 @@ impl State {
         let grid_yz = GridMesh::yz_plane(device, 10);
         let arrow_mesh = ArrowMesh::new(device, 600);
 
+        let line_brightness_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Line Brightness Buffer"),
+            contents: bytemuck::cast_slice(&[1.0f32]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let line_brightness_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &pipelines.brightness_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: line_brightness_buffer.as_entire_binding(),
+            }],
+            label: Some("Line Brightness Bind Group"),
+        });
+
         let identity_model_uniform = celestial_body::ModelUniform::default();
         let identity_model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Identity Model Buffer"),
@@ -176,6 +192,8 @@ impl State {
             grid_xy,
             grid_yz,
             arrow_mesh,
+            line_brightness_buffer,
+            line_brightness_bind_group,
             view: ui::ViewOptions::new(),
             meshes,
             identity_model_bind_group,
@@ -390,10 +408,17 @@ impl State {
                 }
             }
 
+            self.gpu.queue.write_buffer(
+                &self.line_brightness_buffer,
+                0,
+                bytemuck::cast_slice(&[self.view.line_brightness]),
+            );
+
             if self.view.show_arrows {
                 tracing::trace!("set pipeline: grid (arrows)");
                 render_pass.set_pipeline(&self.pipelines.grid);
                 render_pass.set_bind_group(0, &self.camera_rig.bind_group, &[]);
+                render_pass.set_bind_group(1, &self.line_brightness_bind_group, &[]);
                 render_pass.draw_arrows(&self.arrow_mesh);
             }
 
@@ -401,6 +426,7 @@ impl State {
             render_pass.set_pipeline(&self.pipelines.grid);
             tracing::trace!(group = 0, "set bind group: camera (grid)");
             render_pass.set_bind_group(0, &self.camera_rig.bind_group, &[]);
+            render_pass.set_bind_group(1, &self.line_brightness_bind_group, &[]);
             if self.view.show_grid_xz {
                 tracing::trace!("draw grid: XZ");
                 render_pass.draw_grid(&self.grid_xz);
@@ -553,6 +579,13 @@ impl State {
                         ui.checkbox(&mut view.arrows_radial, "Radial (orange)");
                         ui.checkbox(&mut view.arrows_spin, "Spin axis (green)");
                     });
+                ui.separator();
+                ui.horizontal(|ui| {
+                    ui.label("Line brightness:");
+                    ui.add(
+                        egui::Slider::new(&mut view.line_brightness, 0.0..=2.0).fixed_decimals(2),
+                    );
+                });
                 ui.separator();
                 egui::CollapsingHeader::new("Scene Properties")
                     .default_open(true)

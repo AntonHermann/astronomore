@@ -14,10 +14,12 @@ pub struct Pipelines {
     pub fill: wgpu::RenderPipeline,
     /// Pipeline used when the wireframe toggle is on.
     pub wireframe: wgpu::RenderPipeline,
-    /// Layout for the grid pipeline (camera bind group only).
+    /// Layout for the grid pipeline (camera + brightness bind groups).
     pub grid_layout: wgpu::PipelineLayout,
     /// Unlit line-list pipeline drawing the coordinate grids.
     pub grid: wgpu::RenderPipeline,
+    /// Bind group layout for the line-brightness scalar uniform (group 1 of grid pipeline).
+    pub brightness_bind_group_layout: wgpu::BindGroupLayout,
     /// Layout for the normals-overlay pipeline (camera + model bind groups).
     pub normals_layout: wgpu::PipelineLayout,
     /// Line-list pipeline drawing per-vertex normal vectors.
@@ -47,9 +49,23 @@ impl Pipelines {
             ],
             immediate_size: 0,
         });
+        let brightness_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Line Brightness BGL"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
         let grid_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Grid Pipeline Layout"),
-            bind_group_layouts: &[Some(camera_bg_layout)],
+            bind_group_layouts: &[Some(camera_bg_layout), Some(&brightness_bind_group_layout)],
             immediate_size: 0,
         });
         let normals_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -82,6 +98,7 @@ impl Pipelines {
             wireframe,
             grid_layout,
             grid,
+            brightness_bind_group_layout,
             normals_layout,
             normals,
         })
