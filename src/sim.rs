@@ -69,6 +69,11 @@ impl SimState {
         self.multiplier / orbital::SEC_PER_DAY
     }
 
+    /// Returns how many simulation minutes pass for every second in real/wall-clock time.
+    pub fn sim_mins_per_clock_sec(&self) -> f64 {
+        self.sim_days_per_clock_sec() * 1440.0
+    }
+
     /// Jump simulation time to midnight (0:00 UT) of the given Gregorian date.
     pub fn jump_to_date(&mut self, year: i32, month: u8, day: u8) {
         self.time = orbital::jde_to_sim_time(orbital::gregorian_to_jde(year, month, day));
