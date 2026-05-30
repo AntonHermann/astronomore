@@ -560,6 +560,18 @@ impl State {
                     {
                         view.toggle_arrows();
                     }
+                    let offscreen_label = if view.show_offscreen_indicators {
+                        "OffScreen: on"
+                    } else {
+                        "OffScreen: off"
+                    };
+                    if ui
+                        .button(offscreen_label)
+                        .on_hover_text("Toggle (I)")
+                        .clicked()
+                    {
+                        view.toggle_offscreen_indicators();
+                    }
                 });
                 ui.separator();
                 egui::CollapsingHeader::new("Grid")
@@ -947,6 +959,116 @@ impl State {
                 );
             }
         }
+        if self.view.show_offscreen_indicators {
+            let painter = self.ui.ctx.layer_painter(egui::LayerId::new(
+                egui::Order::Foreground,
+                egui::Id::new("offscreen_indicators"),
+            ));
+            let ppp = self.ui.ctx.pixels_per_point();
+            let lw = self.gpu.config.width as f32 / ppp;
+            let lh = self.gpu.config.height as f32 / ppp;
+            let cx = lw * 0.5;
+            let cy = lh * 0.5;
+            const MARGIN: f32 = 30.0;
+            const ARROW_LEN: f32 = 12.0;
+            const ARROW_HALF_W: f32 = 6.0;
+            const LABEL_OFFSET: f32 = 8.0;
+
+            let view_proj = self.camera_rig.projection.cam_to_clip_matrix()
+                * self
+                    .camera_rig
+                    .camera
+                    .world_to_cam_matrix(self.camera_rig.camera.orbit_target(&self.scene));
+
+            for (body_id, name) in &body_list {
+                let world_pos = self
+                    .scene
+                    .get_body_orbital_transform(*body_id)
+                    .transform_point3(Vec3::ZERO);
+                let clip = view_proj * Vec4::new(world_pos.x, world_pos.y, world_pos.z, 1.0);
+
+                let aw = clip.w.abs();
+                if aw < 1e-6 {
+                    continue;
+                }
+
+                // On-screen check requires w > 0 (in front of camera)
+                let ndc_x = clip.x / clip.w;
+                let ndc_y = clip.y / clip.w;
+                let ndc_z = clip.z / clip.w;
+                let on_screen = clip.w > 0.0
+                    && (-1.0..=1.0).contains(&ndc_x)
+                    && (-1.0..=1.0).contains(&ndc_y)
+                    && (0.0..=1.0).contains(&ndc_z);
+                if on_screen {
+                    continue;
+                }
+
+                // Direction from screen center toward body. Using |w| auto-flips
+                // the sign for behind-camera bodies (w < 0).
+                let inv = 1.0 / aw;
+                let mut dx = clip.x * inv * lw;
+                let mut dy = -clip.y * inv * lh; // NDC y up → screen y down
+                let dir_len = (dx * dx + dy * dy).sqrt();
+                if dir_len < 1e-4 {
+                    continue;
+                }
+                dx /= dir_len;
+                dy /= dir_len;
+
+                // Intersect ray from center with the margin-inset screen boundary
+                let tx = if dx > 1e-5 {
+                    (lw - MARGIN - cx) / dx
+                } else if dx < -1e-5 {
+                    (MARGIN - cx) / dx
+                } else {
+                    f32::MAX
+                };
+                let ty = if dy > 1e-5 {
+                    (lh - MARGIN - cy) / dy
+                } else if dy < -1e-5 {
+                    (MARGIN - cy) / dy
+                } else {
+                    f32::MAX
+                };
+                let t = tx.min(ty);
+                if t <= 0.0 {
+                    continue;
+                }
+
+                let tip_x = cx + dx * t;
+                let tip_y = cy + dy * t;
+                let base_x = tip_x - dx * ARROW_LEN;
+                let base_y = tip_y - dy * ARROW_LEN;
+                let perp_x = -dy;
+                let perp_y = dx;
+
+                let tip = egui::pos2(tip_x, tip_y);
+                let left = egui::pos2(
+                    base_x + perp_x * ARROW_HALF_W,
+                    base_y + perp_y * ARROW_HALF_W,
+                );
+                let right = egui::pos2(
+                    base_x - perp_x * ARROW_HALF_W,
+                    base_y - perp_y * ARROW_HALF_W,
+                );
+
+                let color = egui::Color32::from_rgba_unmultiplied(255, 200, 50, 220);
+                painter.add(egui::Shape::convex_polygon(
+                    vec![tip, left, right],
+                    color,
+                    egui::Stroke::NONE,
+                ));
+                painter.text(
+                    egui::pos2(base_x - dx * LABEL_OFFSET, base_y - dy * LABEL_OFFSET),
+                    egui::Align2::CENTER_CENTER,
+                    name.as_str(),
+                    egui::FontId::proportional(11.0),
+                    egui::Color32::from_rgba_unmultiplied(255, 200, 50, 200),
+                );
+            }
+        }
+
         let full_output = self.ui.ctx.end_pass();
 
         self.scene_properties.uniform = props;
@@ -1072,6 +1194,8 @@ impl State {
             self.view.toggle_body_names();
         } else if code == KeyCode::KeyV && state.is_pressed() {
             self.view.toggle_arrows();
+        } else if code == KeyCode::KeyI && state.is_pressed() {
+            self.view.toggle_offscreen_indicators();
         } else {
             self.camera_rig.controller.handle_key(code, state);
         }
