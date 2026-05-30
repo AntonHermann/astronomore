@@ -33,6 +33,8 @@ pub struct ViewOptions {
     pub arrows_radial: bool,
     /// Show spin-axis arrows (green).
     pub arrows_spin: bool,
+    /// Background clear color (RGB, linear).
+    pub background_color: [f32; 3],
 }
 
 impl ViewOptions {
@@ -54,6 +56,7 @@ impl ViewOptions {
             arrows_velocity: true,
             arrows_radial: true,
             arrows_spin: true,
+            background_color: [0.0, 0.0, 0.0],
         }
     }
 
