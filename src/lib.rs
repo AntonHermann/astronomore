@@ -319,9 +319,9 @@ impl State {
                     depth_slice: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
+                            r: self.view.background_color[0] as f64,
+                            g: self.view.background_color[1] as f64,
+                            b: self.view.background_color[2] as f64,
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
@@ -596,6 +596,9 @@ impl State {
                                 props.light_color[0] = lc[0];
                                 props.light_color[1] = lc[1];
                                 props.light_color[2] = lc[2];
+                                ui.end_row();
+                                ui.label("Background:");
+                                ui.color_edit_button_rgb(&mut view.background_color);
                                 ui.end_row();
                                 ui.label("Light pos X:");
                                 ui.add(
