@@ -112,6 +112,7 @@ just san        # cargo fmt + clippy -D warnings
 | L | Körper-Namen-Labels umschalten |
 | V | Debug-Pfeile (Velocity/Radial/Spin) umschalten |
 | I | Off-Screen-Indikatoren (Randpfeile zu nicht sichtbaren Körpern) umschalten |
+| [ / ] | UI-Scale verkleinern / vergrößern (Schritte 0.25, Bereich 0.5–4.0) |
 | G | Alle Gitter umschalten |
 | Escape | Beenden |
 
