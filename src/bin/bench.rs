@@ -137,7 +137,7 @@ fn bench_scene_update(device: &wgpu::Device, queue: &wgpu::Queue) -> u64 {
     let mut sim_time = 0.0f64;
     let start = Instant::now();
     for _ in 0..N_SCENE {
-        scene.update(sim_time, queue);
+        scene.update(sim_time, 0.0001, queue);
         sim_time += 0.016;
     }
     start.elapsed().as_micros() as u64 / N_SCENE as u64

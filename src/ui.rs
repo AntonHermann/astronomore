@@ -45,6 +45,8 @@ pub struct ViewOptions {
     pub label_font_size: f32,
     /// Font size for the off-screen indicator labels at the screen edge.
     pub offscreen_label_font_size: f32,
+    /// Angular velocity factor for body self-rotation (rad per sim-second).
+    pub spin_speed: f32,
 }
 
 impl ViewOptions {
@@ -72,6 +74,7 @@ impl ViewOptions {
             ui_scale: 2.0,
             label_font_size: 14.0,
             offscreen_label_font_size: 20.0,
+            spin_speed: 0.000005,
         }
     }
 

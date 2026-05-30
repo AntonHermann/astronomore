@@ -134,7 +134,7 @@ impl CelestialBody {
         }
     }
 
-    pub fn update(&mut self, sim_time: f64) {
+    pub fn update(&mut self, sim_time: f64, spin_speed: f32) {
         let pos = match self.orbital_parameters.model {
             OrbitalModel::Fixed => Vec3::ZERO,
             OrbitalModel::Parametric {
@@ -147,7 +147,7 @@ impl CelestialBody {
             OrbitalModel::Vsop87 { body } => orbital::heliocentric_position(body, sim_time),
         };
         self.orbital_transform = Mat4::from_translation(pos);
-        self.spin_transform = Mat4::from_rotation_y(0.0001 * sim_time as f32);
+        self.spin_transform = Mat4::from_rotation_y(spin_speed * sim_time as f32);
     }
 
     /// Update the model uniform based on its absolute world transform (i.e. combined with parent transforms) and its spin transform

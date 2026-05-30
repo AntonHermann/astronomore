@@ -219,7 +219,8 @@ impl State {
         self.last_update = now;
 
         self.sim.advance(dt);
-        self.scene.update(self.sim.time, &self.gpu.queue);
+        self.scene
+            .update(self.sim.time, self.view.spin_speed, &self.gpu.queue);
         self.camera_rig.update(dt, &self.scene, &self.gpu.queue);
         self.scene_properties.update(&self.gpu.queue);
         if self.view.show_arrows {
@@ -697,6 +698,13 @@ impl State {
                                 ui.end_row();
                                 ui.label("Parallels:");
                                 ui.add(egui::Slider::new(&mut view.sphere_parallels, 1..=64));
+                                ui.end_row();
+                                ui.label("Spin speed:");
+                                ui.add(
+                                    egui::Slider::new(&mut view.spin_speed, 0.0..=0.001)
+                                        .logarithmic(true)
+                                        .fixed_decimals(7),
+                                );
                                 ui.end_row();
                             });
                     });

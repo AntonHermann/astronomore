@@ -60,10 +60,10 @@ impl Scene {
         }
     }
 
-    pub fn update(&mut self, sim_time: f64, queue: &wgpu::Queue) {
+    pub fn update(&mut self, sim_time: f64, spin_speed: f32, queue: &wgpu::Queue) {
         // update celestial bodies (including their local transforms)
         for cb in &mut self.celestial_bodies {
-            cb.update(sim_time);
+            cb.update(sim_time, spin_speed);
         }
 
         // calculate global transforms and update model uniforms for all celestial bodies
