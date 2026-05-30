@@ -76,12 +76,11 @@ var s_diffuse: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    var base_color: vec3<f32>;
-    if scene_props.use_texture != 0u {
-        base_color = textureSample(t_diffuse, s_diffuse, in.tex_coords).rgb;
-    } else {
-        base_color = scene_props.object_color.xyz;
-    }
+    // Always call textureSample unconditionally so the texture() call lands in
+    // uniform control flow. GLSL ES / WebGL2 compilers reject texture() inside
+    // an if-block even when the condition is dynamically uniform.
+    let tex_color = textureSample(t_diffuse, s_diffuse, in.tex_coords).rgb;
+    let base_color = select(scene_props.object_color.xyz, tex_color, scene_props.use_texture != 0u);
 
     let light_color = scene_props.light_color.xyz;
     let light_pos   = scene_props.light_position.xyz;
