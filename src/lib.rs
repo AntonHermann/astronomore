@@ -147,7 +147,7 @@ impl State {
 
         let line_brightness_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Line Brightness Buffer"),
-            contents: bytemuck::cast_slice(&[1.0f32]),
+            contents: bytemuck::cast_slice(&[1.0f32, 0.0f32, 0.0f32, 0.0f32]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
         let line_brightness_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -411,7 +411,7 @@ impl State {
             self.gpu.queue.write_buffer(
                 &self.line_brightness_buffer,
                 0,
-                bytemuck::cast_slice(&[self.view.line_brightness]),
+                bytemuck::cast_slice(&[self.view.line_brightness, 0.0f32, 0.0f32, 0.0f32]),
             );
 
             if self.view.show_arrows {
