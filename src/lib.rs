@@ -821,10 +821,16 @@ impl State {
                         format!("{:.2}", v)
                     }
                 }
+                let days_per_s = sim.sim_days_per_clock_sec();
+                let rate_str = if days_per_s < 1.0 {
+                    format!("{} min / s", fmt_float(sim.sim_mins_per_clock_sec()))
+                } else {
+                    format!("{} days / s", fmt_float(days_per_s))
+                };
                 ui.label(format!(
-                    "Time factor: {}x ({} days / s)",
+                    "Time factor: {}x ({})",
                     fmt_float(sim.multiplier),
-                    fmt_float(sim.sim_days_per_clock_sec()),
+                    rate_str,
                 ));
                 ui.horizontal(|ui| {
                     if ui.button("◀◀").on_hover_text("Halve (PageDown)").clicked() {
@@ -841,12 +847,29 @@ impl State {
                         sim.reset_speed();
                     }
                     if ui
+                        .button("1 min/s")
+                        .on_hover_text("1 sim minute per second")
+                        .clicked()
+                    {
+                        sim.set_sim_days_per_sec(1.0 / 1440.0);
+                    }
+                    if ui
                         .button("1 d/s")
                         .on_hover_text("1 sim day per second")
                         .clicked()
                     {
                         sim.set_sim_days_per_sec(1.);
                     }
+                });
+                let drag_speed = (sim.multiplier * 0.02).max(0.001);
+                ui.horizontal(|ui| {
+                    ui.label("Multiplier:");
+                    ui.add(
+                        egui::DragValue::new(&mut sim.multiplier)
+                            .speed(drag_speed)
+                            .range(0.0001..=1e15_f64)
+                            .max_decimals(4),
+                    );
                 });
                 ui.separator();
                 ui.label("Jump to date");
