@@ -505,14 +505,6 @@ impl State {
         let raw_input = self.ui.state.take_egui_input(&self.gpu.window);
         self.ui.ctx.set_pixels_per_point(ui_scale);
         self.ui.ctx.begin_pass(raw_input);
-        egui::Area::new(egui::Id::new("fps_overlay"))
-            .anchor(egui::Align2::LEFT_TOP, egui::Vec2::new(8.0, 8.0))
-            .show(&self.ui.ctx, |ui| {
-                ui.set_min_width(80.0);
-                ui.label(
-                    egui::RichText::new(format!("FPS: {:.0}", fps)).color(egui::Color32::BLACK),
-                );
-            });
         egui::Window::new("Simulation")
             .resizable(false)
             .anchor(egui::Align2::RIGHT_TOP, egui::Vec2::new(-8.0, 8.0))
@@ -815,7 +807,12 @@ impl State {
             .anchor(egui::Align2::RIGHT_BOTTOM, egui::Vec2::new(-8.0, -8.0))
             .show(&self.ui.ctx, |ui| {
                 let (y, m, d) = orbital::jde_to_gregorian(orbital::sim_time_to_jde(sim.time));
-                ui.label(format!("Date: {:04}-{:02}-{:02}", y, m, d));
+                ui.horizontal(|ui| {
+                    ui.label(format!("Date: {:04}-{:02}-{:02}", y, m, d));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(format!("FPS: {:.0}", fps));
+                    });
+                });
 
                 fn fmt_float(v: f64) -> String {
                     if v.fract() == 0.0 {
