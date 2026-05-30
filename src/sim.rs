@@ -16,11 +16,17 @@ pub struct SimState {
 }
 
 impl SimState {
-    /// Create a new simulation clock at t=0, 1x speed, running.
+    /// Create a new simulation clock starting at the current wall-clock date, 1 min/s, running.
     pub fn new() -> Self {
+        let unix_secs = web_time::SystemTime::now()
+            .duration_since(web_time::SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs_f64();
+        const UNIX_EPOCH_JDE: f64 = 2_440_587.5;
+        let current_jde = UNIX_EPOCH_JDE + unix_secs / orbital::SEC_PER_DAY;
         Self {
-            time: 0.0,
-            multiplier: 1.0,
+            time: orbital::jde_to_sim_time(current_jde),
+            multiplier: orbital::SEC_PER_DAY / 1440.0,
             is_paused: false,
         }
     }
