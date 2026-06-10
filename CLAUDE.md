@@ -190,3 +190,41 @@ just san        # cargo fmt + clippy -D warnings
 - GLSL-Konzepte aus dem Buch 1:1 in WGSL übertragen; Unterschiede dokumentieren
 - Alle `pub`-Items bekommen einen `///`-Doc-Comment in Englisch
 - Neue Phasen erst beginnen, wenn alle Checkboxen der aktuellen Phase abgehakt sind
+
+## Zusammenarbeit & Workflow (für Claude-Sessions)
+
+Dies ist ein **Lernprojekt** mit zwei Zielen: (1) Anton will Computergrafik
+lernen, (2) ein vorzeigbares Portfolio-Stück entstehen lassen.
+
+### Rollenverteilung
+
+- **Anton implementiert den Grafik-Kern selbst:** Shader-/Beleuchtungslogik,
+  Transformationen & Projektion, Tessellierungs-Algorithmen, Render-Techniken
+  (Normal-Mapping, Bloom, Atmosphäre, Sternen-Punktwolke).
+- **Claude übernimmt:** Boilerplate, UI/QoL (egui), Debugging, WASM/Plattform-
+  Glue, Tests, Build/CI, Doku.
+- Bei Grafik-Kern-Themen **keine fertigen Lösungen** liefern. Stattdessen:
+  falsche Annahme explizit benennen, das Konzept erklären (mit Buchkapitel-
+  oder anderer Referenz), eine Leitfrage stellen — die Implementierung macht
+  Anton. Seine Versuche danach konkret reviewen (konzept-, nicht
+  patch-orientiert). Falsche Annahmen und Verbesserungsmöglichkeiten proaktiv
+  ansprechen, auch unaufgefordert.
+
+### Commit- & Branch-Hygiene
+
+- **Vor jedem Push:** Debug-Hin-und-Her per Rebase zu logischen Commits
+  zusammenfassen. Keine `fixup!`-, `debug:`- oder WIP-Commits und keine
+  Auto-Titel in gepushten Branches oder PRs.
+- **main ist append-only:** main-History niemals umschreiben; Aufräumen
+  passiert auf dem Branch vor dem Merge. (Hintergrund: Bei einem manuellen
+  Rewrite der main-History ging der bereits gemergte PR #15 verloren.)
+- **Branch-Lebenszyklus:** Jede Session endet mit genau einem von drei
+  Zuständen — Branch gemergt, in `docs/JOURNAL.md` als „bereit zum Review"
+  eingetragen, oder Branch gelöscht. Keine stillen Zombie-Branches.
+
+### Session-Routine
+
+- **Session-Start:** `docs/JOURNAL.md` lesen (offene Fäden, Stand).
+- **Session-Ende:** `docs/JOURNAL.md` aktualisieren — was erledigt, was offen,
+  nächster Schritt. Den CLAUDE.md-Phasenplan nur bei tatsächlich
+  abgeschlossenen Features anpassen.
