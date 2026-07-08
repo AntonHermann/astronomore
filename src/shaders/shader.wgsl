@@ -1,3 +1,9 @@
+// Bind groups:
+//  0: Textures and samplers
+//  1: Camera uniform
+//  2: Model uniform
+//  3: Scene properties uniform
+
 // ==== Vertex shader ====
 
 struct CameraUniform {

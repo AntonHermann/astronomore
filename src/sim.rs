@@ -1,3 +1,5 @@
+//! Simulation clock and time controls, including pause, speed-up, and jump-to-date functionality.
+
 use crate::orbital;
 
 /// Simulation clock and time controls.

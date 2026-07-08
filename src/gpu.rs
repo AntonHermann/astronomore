@@ -1,3 +1,5 @@
+//! GPU context, bundles a lot of boilerplate for initialization and resizing.
+
 use std::sync::Arc;
 
 use miette::IntoDiagnostic;

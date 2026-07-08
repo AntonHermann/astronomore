@@ -1,3 +1,7 @@
+//! Data definitions of solar system bodies (sun, planets, earths moon)
+//!
+//! Data: name, texture, radius, orbital model (fixed/parametric/vsop87) and optionally parent
+
 use crate::orbital::{OrbitalModel, Vsop87Body};
 
 /// Typed index into the [`BODIES`] array. The discriminant equals the array index,

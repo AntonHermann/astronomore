@@ -1,3 +1,5 @@
+//! Scene management, including list of celestial bodies, their orbital parameters, and the update loop that calculates their positions and updates their model uniforms.
+
 use crate::celestial_body::{CelestialBody, DrawCelestialBody};
 
 /// Index of a celestial body in the scene's celestial_bodies list.
