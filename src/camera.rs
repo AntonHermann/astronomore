@@ -4,7 +4,7 @@
 
 use std::f32::consts::FRAC_PI_2;
 
-use glam::{Mat4, Vec3, Vec4};
+use glam::{Mat4, Vec3};
 use web_time::Duration;
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalPosition;
@@ -13,13 +13,6 @@ use winit::keyboard::KeyCode;
 
 use crate::scene::{BodyId, Scene};
 
-#[rustfmt::skip]
-const OPENGL_TO_WGPU_MATRIX: Mat4 = Mat4::from_cols(
-    Vec4::new(1.0, 0.0, 0.0, 0.0),
-    Vec4::new(0.0, 1.0, 0.0, 0.0),
-    Vec4::new(0.0, 0.0, 0.5, 0.0),
-    Vec4::new(0.0, 0.0, 0.5, 1.0),
-);
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 
 #[derive(Debug, Clone)]
@@ -165,11 +158,10 @@ impl Projection {
     }
 
     /// Calculate the projection matrix that transforms camera space to clip space.
-    /// Combines a right-handed perspective projection with `OPENGL_TO_WGPU_MATRIX`
-    /// to remap OpenGL's `[-1, 1]` z-range to wgpu's `[0, 1]` convention.
+    /// `perspective_rh` already targets wgpu's `[0, 1]` clip-space z-range (unlike
+    /// `perspective_rh_gl`, which uses OpenGL's `[-1, 1]` range), so no extra remap is needed.
     pub fn cam_to_clip_matrix(&self) -> Mat4 {
-        OPENGL_TO_WGPU_MATRIX
-            * Mat4::perspective_rh(self.fov_y_rad, self.aspect_ratio, self.z_near, self.z_far)
+        Mat4::perspective_rh(self.fov_y_rad, self.aspect_ratio, self.z_near, self.z_far)
     }
 }
 
