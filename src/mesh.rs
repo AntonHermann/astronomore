@@ -16,32 +16,35 @@ pub struct Vertex {
 }
 
 impl Vertex {
-    // // could be used instead of speciying `attributes` explicitly below:
-    // const ATTRIBS: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
-
-    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x2,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 5]>() as wgpu::BufferAddress,
-                    shader_location: 2,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-            ],
-        }
-    }
+    /// Vertex buffer layout for the vertex shader, describing the format of the vertex buffer and how to interpret it.
+    pub const LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayout {
+        // Stride of the vertex buffer (how many bytes to advance to get to the next vertex).
+        array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+        step_mode: wgpu::VertexStepMode::Vertex,
+        // Describes vertex attributes as a mapping of shader locations to offsets and formats in the vertex buffer.
+        attributes: &wgpu::vertex_attr_array![
+            0 => Float32x3, // position
+            1 => Float32x2, // tex_coords
+            2 => Float32x3, // normal
+        ],
+        // attributes: &[
+        //     wgpu::VertexAttribute {
+        //         offset: 0,
+        //         shader_location: 0,
+        //         format: wgpu::VertexFormat::Float32x3,
+        //     },
+        //     wgpu::VertexAttribute {
+        //         offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+        //         shader_location: 1,
+        //         format: wgpu::VertexFormat::Float32x2,
+        //     },
+        //     wgpu::VertexAttribute {
+        //         offset: std::mem::size_of::<[f32; 5]>() as wgpu::BufferAddress,
+        //         shader_location: 2,
+        //         format: wgpu::VertexFormat::Float32x3,
+        //     },
+        // ],
+    };
 }
 impl std::fmt::Display for Vertex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
