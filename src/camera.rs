@@ -1,3 +1,7 @@
+//! Camera definitions, transforms, input handling and GPU resources.
+//!
+//! Computes the view-projection matrix that transforms world-space coordinates to clip-space coordinates.
+
 use std::f32::consts::FRAC_PI_2;
 
 use glam::{Mat4, Vec3, Vec4};

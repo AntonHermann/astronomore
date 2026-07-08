@@ -1,3 +1,5 @@
+//! Loads text or binary files from a path (native) or URL (WASM).
+
 use miette::IntoDiagnostic;
 
 /// Loads a UTF-8 text file from a path (native) or URL (WASM).

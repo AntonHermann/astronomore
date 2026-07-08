@@ -1,3 +1,5 @@
+//! Dbg helper: draw colored arrows
+
 use glam::Vec3;
 
 use crate::grid::ColorVertex;

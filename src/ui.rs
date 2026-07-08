@@ -1,3 +1,5 @@
+//! User interface state and egui integration.
+
 use std::sync::Arc;
 
 /// Toggleable render options driven by keyboard shortcuts and the egui panel.

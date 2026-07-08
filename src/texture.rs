@@ -1,3 +1,5 @@
+//! Texture loading and management, including bind group layout and depth texture creation.
+
 #![allow(dead_code)]
 
 use crate::loader;

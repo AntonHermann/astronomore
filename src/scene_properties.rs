@@ -1,3 +1,5 @@
+//! Scene-level rendering properties + GPU buffer layout: ambient, diffuse, and specular lighting parameters, light position and colour, and a flat object colour for untextured meshes.
+
 use wgpu::util::DeviceExt;
 
 /// GPU-side representation of scene-level rendering parameters.

@@ -1,3 +1,17 @@
+//! Render pipelines for the main scene draw pass.
+//!
+//! The main scene draw pass uses three pipelines:
+//! 1. textured fill pipeline for celestial bodies,
+//! 2. wireframe pipeline for celestial bodies (debug)
+//! 3. unlit grid pipeline for coordinate grids and arrows.
+//!
+//! Pipelines 1 and 2 share the same vertex shader and layout, but have different fragment shaders and polygon modes.
+//! Pipeline 3 uses a different vertex shader and layout, and draws line lists instead of triangles.
+//!
+//! ## Bind group layouts:
+//! - Main: 0 = texture, 1 = camera, 2 = model, 3 = scene properties.
+//! - Grid: 0 = camera, 1 = line brightness uniform.
+
 use crate::{grid::ColorVertex, loader, mesh::Vertex, shader_loader, texture::Texture};
 
 /// All render pipelines used by the main scene draw pass: the textured fill

@@ -1,3 +1,10 @@
+//! Orbital mechanics and VSOP87A planetary positions.
+//!
+//! 3 orbital models are supported:
+//! - [`OrbitalModel::Fixed`]: the body sits at the scene origin (the Sun).
+//! - [`OrbitalModel::Parametric`]: a simple circular orbit in the parent's XZ plane.
+//! - [`OrbitalModel::Vsop87`]: heliocentric rectangular coordinates from the VSOP87A theory (in AU, J2000 ecliptic).
+
 use glam::Vec3;
 
 /// Scale factor: 1 astronomical unit = `AU_TO_SCENE` scene units.

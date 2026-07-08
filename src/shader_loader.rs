@@ -1,7 +1,7 @@
-/// Loads, parses, and validates WGSL shaders with miette-formatted error messages.
-///
-/// On failure, errors include source-highlighted spans pointing to the exact
-/// location of the syntax or validation problem - similar to Rust compiler output.
+//! Loading, parsing, and validating WGSL shaders with miette-formatted error messages.
+//!
+//! On failure, errors include source-highlighted spans pointing to the exact
+//! location of the syntax or validation problem - similar to Rust compiler output.
 use miette::{LabeledSpan, NamedSource, SourceSpan};
 
 /// A WGSL compilation or validation error with source-span information for miette.

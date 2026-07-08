@@ -1,3 +1,5 @@
+//! Vertex and mesh definitions, including GPU buffer layouts, drawing helpers and some simple constructors for common meshes (sphere, pentagon, planes).
+
 use std::ops::Range;
 
 use wgpu::util::DeviceExt;

@@ -1,3 +1,5 @@
+//! Dbg helper: draw colored vertex + grids (used for xy, xz, yz planes)
+
 use wgpu::util::DeviceExt;
 
 /// A vertex carrying a world-space position and an RGBA color, used for unlit geometry like grids.

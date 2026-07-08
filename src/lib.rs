@@ -374,29 +374,36 @@ impl State {
             } else {
                 &self.pipelines.fill
             };
-            tracing::trace!(
-                mode = if self.view.wireframe {
-                    "wireframe"
-                } else {
-                    "fill"
-                },
-                "set pipeline"
-            );
+            #[rustfmt::skip]
+            tracing::trace!(mode = if self.view.wireframe { "wireframe" } else { "fill" }, "set pipeline");
+
+            // =================== Setup main pipeline ====================
+            // Bind groups:
+            // - 0: texture
+            // - 1: camera
+            // - 2: model
+            // - 3: scene properties
             render_pass.set_pipeline(pipeline);
+
             tracing::trace!(group = 0, "set bind group: diffuse texture");
             render_pass.set_bind_group(0, &self.diffuse_texture.bind_group, &[]);
+
             tracing::trace!(group = 1, "set bind group: camera");
             render_pass.set_bind_group(1, &self.camera_rig.bind_group, &[]);
+
             tracing::trace!(group = 2, "set bind group: identity model");
             render_pass.set_bind_group(2, &self.identity_model_bind_group, &[]);
+
             tracing::trace!(group = 3, "set bind group: scene properties");
             render_pass.set_bind_group(3, &self.scene_properties.bind_group, &[]);
 
+            // =================== Draw generic meshes ====================
             tracing::trace!(count = self.meshes.len(), "draw meshes");
             for mesh in &self.meshes {
                 render_pass.draw_mesh(mesh);
             }
 
+            // ============= Draw scene (internally draws celestial bodies) ==============
             tracing::trace!("draw scene");
             render_pass.draw_scene(
                 &self.scene,
@@ -404,6 +411,7 @@ impl State {
                 &self.scene_properties.bind_group,
             );
 
+            // =================== Draw normals if enabled ====================
             if self.view.show_normals {
                 tracing::trace!("set pipeline: normals");
                 render_pass.set_pipeline(&self.pipelines.normals);
@@ -417,6 +425,7 @@ impl State {
                 }
             }
 
+            // =================== Draw grid and arrows if enabled ====================
             self.gpu.queue.write_buffer(
                 &self.line_brightness_buffer,
                 0,
@@ -433,9 +442,9 @@ impl State {
 
             tracing::trace!("set pipeline: grid");
             render_pass.set_pipeline(&self.pipelines.grid);
-            tracing::trace!(group = 0, "set bind group: camera (grid)");
             render_pass.set_bind_group(0, &self.camera_rig.bind_group, &[]);
             render_pass.set_bind_group(1, &self.line_brightness_bind_group, &[]);
+
             if self.view.show_grid_xz {
                 tracing::trace!("draw grid: XZ");
                 render_pass.draw_grid(&self.grid_xz);

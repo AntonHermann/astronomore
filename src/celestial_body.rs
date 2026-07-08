@@ -1,3 +1,5 @@
+//! Celestial body definitions, orbital parameters, and GPU resources.
+
 use std::ops::Range;
 
 use glam::{Mat4, Vec3};
@@ -43,7 +45,6 @@ pub struct OrbitalParameters {
 }
 
 pub struct CelestialBody {
-    #[allow(dead_code)]
     pub name: String,
     texture: Texture,
     mesh: Mesh,
@@ -56,7 +57,8 @@ pub struct CelestialBody {
     pub spin_transform: Mat4,
     /// World-space position of this body, updated each frame by `Scene::update`.
     pub world_position: Vec3,
-    /// Uniform containing the combined model transform (world * spin) and radius for this body, to be passed to the shader
+    /// Uniform containing the combined model transform (world * spin * scale, transform from model space to world space)
+    /// for this body, to be passed to the shader
     pub model_uniform: ModelUniform,
     pub model_buffer: wgpu::Buffer,
     pub model_bind_group: wgpu::BindGroup,
