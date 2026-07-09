@@ -34,11 +34,12 @@ jobs:
 
       - name: Assemble site
         run: |
-          mkdir -p _site/src
+          mkdir -p _site/src _site/docs
           cp index.html _site/
           cp -r pkg _site/
           cp -r assets _site/
           cp -r src/shaders _site/src/
+          cp docs/opengl-wgpu-mapping.html _site/docs/
 
       - uses: actions/upload-pages-artifact@v3
         with:
