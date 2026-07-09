@@ -152,6 +152,39 @@
   .chip.steel { background: var(--steel); }
   .legend-item .hint { color: var(--muted); font-style: italic; }
 
+  .badge-legend {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0 0;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+    padding: 0.05rem 0.4rem;
+    border-radius: 3px;
+    margin-left: 0.35rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    vertical-align: middle;
+    cursor: help;
+  }
+  .badge.spec {
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--muted);
+  }
+  .badge.stil {
+    color: var(--bg);
+    background: var(--muted);
+  }
+  .tag-source { display: inline-flex; align-items: center; }
+
   section.stage {
     margin: 3.6rem 0;
     max-width: 900px;
@@ -311,6 +344,13 @@
     <div class="legend-item"><span class="chip steel"></span> Modernes OpenGL (3.3+ Core / GLSL 330) <span class="hint">— zum Aufklappen anklicken</span></div>
     <div class="legend-item"><span class="chip teal"></span> Rust — wgpu 29 / WGSL (astronomore)</div>
   </div>
+  <p class="badge-legend mono">
+    Jedes Codebeispiel trägt zusätzlich ein Etikett:
+    <span class="badge spec" title="Von der jeweiligen API-Version selbst festgelegt — bei jeder Implementierung dieser Version gleich, nicht austauschbar.">Spec</span>
+    von der API-Version selbst festgelegt,
+    <span class="badge stil" title="Wahl der Fenster-Bibliothek, des Buchs oder des Projekts — bei gleicher API-Version durch eine andere Wahl ersetzbar.">Stil</span>
+    Wahl der Fenster-Bibliothek/des Buchs/des Projekts, austauschbar ohne Versionswechsel.
+  </p>
 </header>
 
 <section class="stage">
@@ -320,7 +360,7 @@
   <p class="stage-prose">Damit dieser Callback <em>überhaupt wiederholt</em> aufgerufen wird, muss jeder Frame selbst wieder einen weiteren anfordern — sonst würde die Schleife nach dem ersten Frame verstummen. Das ist die Aufgabe von <code class="mono">request_redraw()</code> am Anfang von <code class="mono">render()</code>: es plant keinen neuen Frame sofort, sondern reiht für die <em>nächste</em> Runde der winit-eigenen Schleife ein <code class="mono">RedrawRequested</code>-Event ein.</p>
   <div class="compare">
     <div class="panel legacy">
-      <div class="panel-tag mono"><span>FlaecheSchwingt.java</span><b>renderLoop() — Schleife im eigenen Code</b></div>
+      <div class="panel-tag mono"><span class="tag-source">FlaecheSchwingt.java<span class="badge stil" title="Wahl der Fenster-Bibliothek LWJGL — nicht von OpenGL selbst vorgeschrieben.">Stil · LWJGL</span></span><b>renderLoop() — Schleife im eigenen Code</b></div>
       <pre class="mono"><code><span class="cm">// LWJGLBasisFenster.start():</span>
 initDisplay();
 <span class="kw amber">renderLoop</span>();   <span class="cm">// blockiert hier bis Close</span>
@@ -337,7 +377,7 @@ Display.destroy();
 }</code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span>GLFW · kein Vorlagen-Bezug</span><b>gleiche Architektur wie links</b></summary>
+      <summary class="mono"><span class="tag-source">GLFW · kein Vorlagen-Bezug<span class="badge stil" title="Wahl der Fenster-Bibliothek GLFW — nicht von OpenGL selbst vorgeschrieben.">Stil · GLFW</span></span><b>gleiche Architektur wie links</b></summary>
       <pre class="mono"><code>GLFWwindow* window = glfwCreateWindow(800, 600, "GL", 0, 0);
 glfwMakeContextCurrent(window);
 gladLoadGLLoader(...);  <span class="cm">// Funktionszeiger laden —</span>
@@ -353,7 +393,7 @@ glfwTerminate();</code></pre>
       <p class="gl-note"><strong>Kein Fortschritt hier:</strong> Moderne Desktop-GL-Tutorials (GLFW/SDL) nutzen strukturell dieselbe App-eigene <code class="mono">while</code>-Schleife wie das Dino-Buch — nur der Fenster-Layer ist ausgetauscht. Der Sprung "App besitzt die Schleife" → "Bibliothek besitzt die Schleife" ist spezifisch der wgpu/winit-Schnitt, keine Konsequenz aus Shadern oder Core-Profile.</p>
     </details>
     <div class="panel modern">
-      <div class="panel-tag mono"><span>lib.rs:1519, 1446, 296</span><b>run_app() — Schleife in winit, wir nur Callback</b></div>
+      <div class="panel-tag mono"><span class="tag-source">lib.rs:1519, 1446, 296<span class="badge stil" title="Wahl der Fenster-Bibliothek winit — nicht von wgpu selbst vorgeschrieben.">Stil · winit</span></span><b>run_app() — Schleife in winit, wir nur Callback</b></div>
       <pre class="mono"><code><span class="cm">// run() — DIES ist die eigentliche Schleife,</span>
 <span class="cm">// nur gehoert sie winit statt uns:</span>
 event_loop.run_app(&amp;<span class="kw teal">mut</span> app)?;   <span class="cm">// blockiert hier</span>
@@ -391,7 +431,7 @@ self.gpu.window.request_redraw();
   <p class="stage-prose">POGL bündelt zwei State-Machine-Aufrufe zu einer Hilfsfunktion. In wgpu ist "löschen" kein Befehl mehr, den man mittendrin ausführt, sondern eine Eigenschaft, die man beim Eröffnen des Render-Passes deklariert.</p>
   <div class="compare">
     <div class="panel legacy">
-      <div class="panel-tag mono"><span>POGL.java</span><b>clearBackgroundWithColor</b></div>
+      <div class="panel-tag mono"><span class="tag-source">POGL.java<span class="badge spec" title="glClearColor/glClear sind seit GL 1.0 Teil der Spec und im Core-Profile unverändert erhalten.">Spec · GL 1.0+</span></span><b>clearBackgroundWithColor</b></div>
       <pre class="mono"><code><span class="kw amber">public static void</span> clearBackgroundWithColor(
     <span class="kw amber">float</span> r, <span class="kw amber">float</span> g, <span class="kw amber">float</span> b, <span class="kw amber">float</span> a) {
   glClearColor(r, g, b, a);
@@ -399,7 +439,7 @@ self.gpu.window.request_redraw();
 }</code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span>GL 3.3 Core · kein Vorlagen-Bezug</span><b>unverändert zu links</b></summary>
+      <summary class="mono"><span class="tag-source">GL 3.3 Core · kein Vorlagen-Bezug<span class="badge spec" title="Unverändert seit GL 1.0, auch im Core-Profile.">Spec · GL 1.0+</span></span><b>unverändert zu links</b></summary>
       <pre class="mono"><code>glClearColor(0.95f, 0.95f, 0.95f, 1.0f);
 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 <span class="cm">// meist mit Tiefenpuffer kombiniert, aber sonst</span>
@@ -407,7 +447,7 @@ glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       <p class="gl-note"><strong>Kein Fortschritt hier:</strong> <code class="mono">glClearColor</code>/<code class="mono">glClear</code> gehören zu den wenigen Fixed-Function-Resten, die das Core-Profile unverändert übernommen hat — Clearing ist API-seitig nie "shaderpflichtig" geworden.</p>
     </details>
     <div class="panel modern">
-      <div class="panel-tag mono"><span>lib.rs:341–367</span><b>RenderPassDescriptor</b></div>
+      <div class="panel-tag mono"><span class="tag-source">lib.rs:341–367<span class="badge spec" title="LoadOp::Clear im Descriptor ist Teil des wgpu-API-Designs selbst.">Spec · wgpu</span></span><b>RenderPassDescriptor</b></div>
       <pre class="mono"><code>RenderPassColorAttachment {
   view: &amp;frame_view,
   ops: Operations {
@@ -439,7 +479,7 @@ depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
   <p class="stage-prose">Das ist der größte architektonische Sprung im ganzen Vergleich. <code class="mono">glBegin</code>/<code class="mono">glVertex</code>/<code class="mono">glEnd</code> schickt bei <em>jedem einzelnen Frame</em> jeden Vertex einzeln über den Treiber zur GPU. wgpu lädt die Geometrie <em>einmalig</em> auf die GPU und referenziert sie danach nur noch.</p>
   <div class="compare">
     <div class="panel legacy">
-      <div class="panel-tag mono"><span>POGL.java</span><b>Würfel, immediate mode</b></div>
+      <div class="panel-tag mono"><span class="tag-source">POGL.java<span class="badge spec" title="Immediate Mode existiert nur im Compatibility-Profile; im Core-Profile (3.2+) entfernt.">Spec · Compat-Profile</span></span><b>Würfel, immediate mode</b></div>
       <pre class="mono"><code>glBegin(GL_QUADS);
   glVertex3f(-1, -1, -1); <span class="cm">// Punkt A</span>
   glVertex3f( 1, -1, -1); <span class="cm">// Punkt B</span>
@@ -449,7 +489,7 @@ depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
 glEnd();</code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span>GL 3.3 Core · kein Vorlagen-Bezug</span><b>fast wie rechts</b></summary>
+      <summary class="mono"><span class="tag-source">GL 3.3 Core · kein Vorlagen-Bezug<span class="badge spec" title="VAOs sind im Core-Profile (3.2+) zwingend, um überhaupt zeichnen zu können.">Spec · Core-Profile</span></span><b>fast wie rechts</b></summary>
       <pre class="mono"><code><span class="cm">// einmalig:</span>
 <span class="kw steel">unsigned int</span> VAO, VBO, EBO;
 glGenVertexArrays(1, &amp;VAO);
@@ -470,7 +510,7 @@ glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, 0);</code></pre>
       <p class="gl-note"><strong>Hier konvergiert es:</strong> VAO/VBO/EBO sind praktisch dieselbe Architektur wie Vertex-/Index-Buffer in wgpu — einmal hochladen, pro Frame nur binden. Der Immediate-Mode → Buffer-Sprung ist der eigentliche "moderne" Schnitt in der GPU-Programmierung insgesamt, nicht etwas, das erst mit wgpu kommt. Nur die Typsicherheit (Layout wird zur Compile-Zeit geprüft statt per <code class="mono">glVertexAttribPointer</code>-Offset von Hand) ist wgpu-spezifisch.</p>
     </details>
     <div class="panel modern">
-      <div class="panel-tag mono"><span>mesh.rs:123 · celestial_body.rs:204–216</span><b>einmalig hochladen, pro Frame nur binden</b></div>
+      <div class="panel-tag mono"><span class="tag-source">mesh.rs:123 · celestial_body.rs:204–216<span class="badge spec" title="Buffer-basiertes Zeichnen ist inhärent im wgpu-Design — es gibt keinen Immediate-Mode-Modus.">Spec · wgpu</span></span><b>einmalig hochladen, pro Frame nur binden</b></div>
       <pre class="mono"><code><span class="cm">// einmalig, beim Erzeugen des Körpers (mesh.rs:123):</span>
 <span class="kw teal">let</span> mesh = Mesh::sphere(device, 128, 64);
 <span class="cm">// -&gt; vertex_buffer, index_buffer liegen ab jetzt auf der GPU</span>
@@ -496,16 +536,18 @@ self.draw_indexed(0..cb.mesh.num_elements, 0, instances);</code></pre>
   <p class="stage-prose">Folie 41/42 zeigt die Kette <code class="mono">M=I; M*P; M*T; M*R; M*S</code> als flache Folge mutierender Aufrufe auf einem globalen Matrix-Stack. Um sie mit der rechten Seite vergleichbar zu machen, wird sie hier <em>nicht</em> in der Reihenfolge der Folie abgetippt, sondern nach denselben drei Rollen umsortiert, die astronomore explizit benennt: Projektion, View, Modell.</p>
   <div class="compare">
     <div class="panel legacy">
-      <div class="panel-tag mono"><span>FlaecheSchwingt.java:46–58, umsortiert</span><b>ein Stack, drei Rollen</b></div>
+      <div class="panel-tag mono"><span class="tag-source">FlaecheSchwingt.java:46–58, umsortiert<span class="badge spec" title="Der Matrix-Stack (glLoadIdentity/glFrustum/glTranslate/...) existiert nur im Compatibility-Profile; im Core-Profile entfernt.">Spec · Compat-Profile</span></span><b>ein Stack, drei Rollen</b></div>
       <pre class="mono"><code>glLoadIdentity();                       <span class="cm">// M = I</span>
 
 <span class="cm">// Projektion (Kamera- -&gt; Clip-Space):</span>
 glFrustum(-1,1, -1,1, 3,10);            <span class="cm">// M = M*P</span>
 
-<span class="cm">// View (Welt- -&gt; Kamera-Space): fehlt hier ganz —</span>
-<span class="cm">// die Kamera steht fest im Ursprung, es gibt keinen</span>
-<span class="cm">// glTranslate/glRotate fuer eine Kamera. View = I,</span>
-<span class="cm">// bleibt im Stack unsichtbar.</span>
+<span class="cm">// View (Welt- -&gt; Kamera-Space): fehlt in DIESEM</span>
+<span class="cm">// Beispiel ganz — die Kamera steht fest im Ursprung.</span>
+<span class="cm">// Das ist eine Eigenschaft dieses Buch-Beispiels, nicht</span>
+<span class="cm">// von GL11 selbst: eine bewegte Kamera waere genauso</span>
+<span class="cm">// im selben Stack, nur zusaetzlich vor T/R/S — und</span>
+<span class="cm">// genauso unbenannt/unsichtbar.</span>
 
 <span class="cm">// Modell (Objekt- -&gt; Welt-Space):</span>
 glTranslated(0, 0, -4);                 <span class="cm">// M = M*T</span>
@@ -515,7 +557,7 @@ glScaled(0.8, 0.8, 0.8);                <span class="cm">// M = M*S</span>
 POGL.renderViereck();  <span class="cm">// v' = M*v = P*(T*R*S)*v, pro Vertex</span></code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span>GLM · kein Vorlagen-Bezug</span><b>fast wie rechts</b></summary>
+      <summary class="mono"><span class="tag-source">GLM · kein Vorlagen-Bezug<span class="badge stil" title="GLM ist eine Drittanbieter-Mathebibliothek, nicht Teil der OpenGL-Spec — genau wie glam für wgpu.">Stil · GLM (3rd-party)</span></span><b>fast wie rechts</b></summary>
       <pre class="mono"><code><span class="cm">// Stack faellt im Core-Profile komplett weg —</span>
 <span class="cm">// glLoadIdentity/glFrustum/glTranslate sind deprecated.</span>
 <span class="cm">// Stattdessen CPU-seitige Matrizen (hier: GLM):</span>
@@ -533,7 +575,7 @@ glUniformMatrix4fv(loc("model"), 1, GL_FALSE, ...);</code></pre>
       <p class="gl-note"><strong>Hier konvergiert es:</strong> GLM ist absichtlich API-kompatibel zu genau diesem Stil gebaut (<code class="mono">perspective</code>/<code class="mono">lookAt</code>/<code class="mono">translate</code>/<code class="mono">rotate</code>/<code class="mono">scale</code> als benannte Funktionen auf <code class="mono">mat4</code>-Werten) — praktisch derselbe Ansatz wie <code class="mono">glam</code> rechts, nur in C++ und mit String-basiertem <code class="mono">glGetUniformLocation</code>-Lookup statt nummerierten Bind Groups. Die Sprache wechselt, das Konzept "explizite CPU-Matrix statt globalem Stack" nicht.</p>
     </details>
     <div class="panel modern">
-      <div class="panel-tag mono"><span>camera.rs:163–164,382–384 · celestial_body.rs:24–26</span><b>explizite glam-Ausdrücke</b></div>
+      <div class="panel-tag mono"><span class="tag-source">camera.rs:163–164,382–384 · celestial_body.rs:24–26<span class="badge stil" title="glam ist eine Drittanbieter-Mathebibliothek, nicht Teil der wgpu-API — genau wie GLM für OpenGL.">Stil · glam (3rd-party)</span></span><b>explizite glam-Ausdrücke</b></div>
       <pre class="mono"><code><span class="cm">// Projektion, camera.rs:164 (Kamera- -&gt; Clip-Space):</span>
 <span class="kw teal">let</span> proj = Mat4::perspective_rh(fov_y_rad, aspect_ratio, z_near, z_far);
 
@@ -552,17 +594,17 @@ self.view_proj = (proj * view).to_cols_array_2d();
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>Die Reihenfolge-Logik ("rechts wirkt zuerst") ist identisch — das ist dieselbe Mathematik. Der eigentliche Unterschied zeigt sich erst, wenn man beide Seiten in dieselben drei Rollen sortiert: astronomore hat für View und Modell <em>zwei getrennte, benannte</em> Ausdrücke (<code class="mono">proj * view</code> einmal pro Frame in <code class="mono">CameraUniform::update_view_proj</code>, <code class="mono">world * spin * scale</code> einmal pro Körper in <code class="mono">ModelUniform::new</code>) — GL11 dagegen kennt diese Trennung als Konzept gar nicht: Der Fixed-Function-Stack heißt nicht zufällig <code class="mono">GL_MODELVIEW</code> (im Gegensatz zu <code class="mono">GL_PROJECTION</code>) — View und Modell sind von Anfang an <em>ein</em> Stack, ein Name, eine Matrix. Im Beispiel oben fällt die View sogar ganz weg (Kamera fest im Ursprung), was im Code unsichtbar bleibt; man kann ihm nicht ansehen, ob <code class="mono">glTranslated(0,0,-4)</code> "die Kamera wegbewegen" oder "das Objekt platzieren" bedeutet — beides läuft im selben Stack. glam erzwingt diese Unterscheidung von Anfang an, weil <code class="mono">view</code> und <code class="mono">model</code> zwei separate Variablen mit eigenem Typ sind. Modernes GL (Mitte) trifft dieselbe Entscheidung wie astronomore — der Stack ist also ein Fixed-Function-Merkmal, kein "OpenGL vs. wgpu"-Merkmal.</p>
+    <p>Die Reihenfolge-Logik ("rechts wirkt zuerst") ist identisch — das ist dieselbe Mathematik. Der eigentliche Unterschied zeigt sich erst, wenn man beide Seiten in dieselben drei Rollen sortiert: astronomore hat für View und Modell <em>zwei getrennte, benannte</em> Ausdrücke (<code class="mono">proj * view</code> einmal pro Frame in <code class="mono">CameraUniform::update_view_proj</code>, <code class="mono">world * spin * scale</code> einmal pro Körper in <code class="mono">ModelUniform::new</code>) — GL11 dagegen kennt diese Trennung als Konzept gar nicht: Der Fixed-Function-Stack heißt nicht zufällig <code class="mono">GL_MODELVIEW</code> (im Gegensatz zu <code class="mono">GL_PROJECTION</code>) — View und Modell sind von Anfang an <em>ein</em> Stack, ein Name, eine Matrix. Im Beispiel oben fällt die View sogar ganz weg (Kamera fest im Ursprung), was im Code unsichtbar bleibt; man kann ihm nicht ansehen, ob <code class="mono">glTranslated(0,0,-4)</code> "die Kamera wegbewegen" oder "das Objekt platzieren" bedeutet — beides läuft im selben Stack. glam erzwingt diese Unterscheidung von Anfang an, weil <code class="mono">view</code> und <code class="mono">model</code> zwei separate Variablen mit eigenem Typ sind. Modernes GL (Mitte) trifft dieselbe Entscheidung wie astronomore — der Stack ist also ein Fixed-Function-Merkmal, kein "OpenGL vs. wgpu"-Merkmal. Dass dafür GLM bzw. glam zum Einsatz kommen, ist wiederum <em>keine</em> API-Vorgabe: beides sind austauschbare Drittanbieter-Bibliotheken (man könnte genauso eine andere Mathe-Bibliothek oder eigene <code class="mono">float[16]</code>-Multiplikation schreiben) — nur eben eine, die in beiden Ökosystemen zum Quasi-Standard wurde.</p>
   </div>
 </section>
 
 <section class="stage">
   <p class="stage-label mono"><span class="n">05</span> · daten in den shader bringen</p>
   <h2>Built-ins vs. explizite Bind Groups</h2>
-  <p class="stage-prose">Die Torus-Shader nutzen GLSL-Built-ins, die im Fixed-Function-Kontext "einfach da sind" — <code class="mono">gl_ModelViewProjectionMatrix</code>, <code class="mono">gl_Normal</code>. WGSL kennt so etwas nicht: jede Matrix, jeder Wert muss über eine <code class="mono">struct</code> deklariert und einer Bind Group zugeordnet werden.</p>
+  <p class="stage-prose">Die Torus-Shader nutzen GLSL-Built-ins, die im Fixed-Function-Kontext "einfach da sind" — <code class="mono">gl_ModelViewProjectionMatrix</code>, <code class="mono">gl_Normal</code>. Sie sind nur deshalb befüllt, weil der CPU-Code aus Stufe 4 genau diesen Matrix-Stack (<code class="mono">glLoadIdentity</code>/<code class="mono">glFrustum</code>/...) bespielt — die Built-ins sind also eine direkte Konsequenz der Stack-Wahl, kein separates Feature. WGSL kennt so etwas nicht: jede Matrix, jeder Wert muss über eine <code class="mono">struct</code> deklariert und einer Bind Group zugeordnet werden.</p>
   <div class="compare">
     <div class="panel legacy">
-      <div class="panel-tag mono"><span>torusambientdiffusespecularfinal.vs</span><b>implizite Built-ins</b></div>
+      <div class="panel-tag mono"><span class="tag-source">torusambientdiffusespecularfinal.vs<span class="badge spec" title="gl_ModelViewProjectionMatrix &amp; co. existieren nur unter #version 130 (Compatibility); im Core-Profile (#version 150 core+) entfernt.">Spec · Compat-GLSL</span></span><b>implizite Built-ins</b></div>
       <pre class="mono"><code>#version 130
 <span class="kw amber">uniform float</span> ambient, diffuseWeight, specularWeight;
 <span class="kw amber">uniform vec3</span> lightDirection;
@@ -574,7 +616,7 @@ self.view_proj = (proj * view).to_cols_array_2d();
 }</code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span>GLSL 330 core · kein Vorlagen-Bezug</span><b>fast wie rechts</b></summary>
+      <summary class="mono"><span class="tag-source">GLSL 330 core · kein Vorlagen-Bezug<span class="badge spec" title="gl_ModelViewProjectionMatrix &amp; co. sind im Core-Profile entfernt — explizite in/uniform-Deklaration ist Pflicht.">Spec · GLSL 330 core</span></span><b>fast wie rechts</b></summary>
       <pre class="mono"><code>#version 330 core
 <span class="kw steel">layout</span>(location=0) <span class="kw steel">in</span> vec3 aPos;
 <span class="kw steel">layout</span>(location=1) <span class="kw steel">in</span> vec2 aTexCoord;
@@ -593,7 +635,7 @@ self.view_proj = (proj * view).to_cols_array_2d();
       <p class="gl-note"><strong>Hier konvergiert es fast:</strong> <code class="mono">gl_ModelViewProjectionMatrix</code> ist im Core-Profile komplett verschwunden — Position, Uniforms und Normale müssen genauso explizit deklariert werden wie in WGSL. Der Unterschied zu rechts ist nur die <em>Bindung</em>: <code class="mono">glGetUniformLocation(program, "model")</code> ist ein loser String-Lookup ohne Layout-Prüfung zur Compile-Zeit — im Gegensatz zu WGSLs nummerierten <code class="mono">@group</code>/<code class="mono">@binding</code>, die <code class="mono">naga</code> vorab validiert.</p>
     </details>
     <div class="panel modern">
-      <div class="panel-tag mono"><span>shader.wgsl:1–42</span><b>explizite Bind Groups</b></div>
+      <div class="panel-tag mono"><span class="tag-source">shader.wgsl:1–42<span class="badge spec" title="WGSL hatte nie implizite Matrix-Built-ins — explizite Bindings sind von Anfang an Sprachdesign.">Spec · WGSL</span></span><b>explizite Bind Groups</b></div>
       <pre class="mono"><code><span class="cm">// group 1: Kamera</span>
 <span class="kw teal">struct</span> CameraUniform { view_proj: mat4x4&lt;f32&gt;, camera_pos: vec3&lt;f32&gt; }
 @group(1) @binding(0) <span class="kw teal">var</span>&lt;uniform&gt; camera: CameraUniform;
@@ -605,7 +647,7 @@ self.view_proj = (proj * view).to_cols_array_2d();
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>Nichts kommt "von irgendwoher": jede Bind Group in astronomore hat eine feste, dokumentierte Nummer (0 Textur, 1 Kamera, 2 Modell, 3 Szene-Eigenschaften — siehe Kommentar oben in <code class="mono">shader.wgsl</code>). Der Preis dafür ist mehr Boilerplate; der Gewinn ist, dass der Shader unabhängig vom Rest der Pipeline lesbar und typgeprüft ist (<code class="mono">naga</code>-Validierung statt Laufzeit-Crash). Modernes GLSL (Mitte) löst das "woher?"-Problem schon — nur die Absicherung dagegen bleibt schwächer als bei WGSL.</p>
+    <p>Nichts kommt "von irgendwoher": jede Bind Group in astronomore hat eine feste, dokumentierte Nummer (0 Textur, 1 Kamera, 2 Modell, 3 Szene-Eigenschaften — siehe Kommentar oben in <code class="mono">shader.wgsl</code>). <em>Dass</em> es Bind Groups geben muss, ist WGSL-Spec; <em>welche Nummer</em> wofür steht, ist reine astronomore-Konvention — WGSL selbst schreibt keine Bedeutung für Gruppe 0/1/2/3 vor, genau wie GLSL keine Bedeutung für den Uniform-Namen <code class="mono">"lightDirection"</code> vorschreibt. Der Preis für die Bind-Group-Pflicht ist mehr Boilerplate; der Gewinn ist, dass der Shader unabhängig vom Rest der Pipeline lesbar und typgeprüft ist (<code class="mono">naga</code>-Validierung statt Laufzeit-Crash). Modernes GLSL (Mitte) löst das "woher?"-Problem schon — nur die Absicherung dagegen bleibt schwächer als bei WGSL.</p>
   </div>
 </section>
 
@@ -615,7 +657,7 @@ self.view_proj = (proj * view).to_cols_array_2d();
   <p class="stage-prose">Beide Beispiele rechnen ambient + diffus + spekular. Der Torus-Shader tut das pro <em>Vertex</em> und interpoliert die fertige Farbe über das Dreieck (Gouraud-Shading) — sichtbar an den Facetten bei grober Tessellierung. astronomore rechnet pro <em>Fragment</em> und nutzt den Blinn-Phong-Halfway-Vektor statt <code class="mono">reflect()</code>.</p>
   <div class="compare">
     <div class="panel legacy">
-      <div class="panel-tag mono"><span>torusambientdiffusespecularfinal.vs</span><b>Phong, pro Vertex</b></div>
+      <div class="panel-tag mono"><span class="tag-source">torusambientdiffusespecularfinal.vs<span class="badge stil" title="Vertex- statt Fragment-Lighting ist eine Stil-/Beispielentscheidung des Buchs — keine GLSL-Versionsgrenze.">Stil · Buch-Beispiel</span></span><b>Phong, pro Vertex</b></div>
       <pre class="mono"><code>vec3 l = normalize(lightDirection - (gl_ModelViewProjectionMatrix
                                        * gl_Vertex).xyz);
 vec3 n = gl_NormalMatrix * gl_Normal;
@@ -628,7 +670,7 @@ color = vec4(1) * (ambient + diffuse*diffuseWeight
 <span class="cm">// -&gt; als "flat" color interpoliert, .fs gibt sie nur aus</span></code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span>GLSL 330 core · kein Vorlagen-Bezug</span><b>fast wie rechts</b></summary>
+      <summary class="mono"><span class="tag-source">GLSL 330 core · kein Vorlagen-Bezug<span class="badge stil" title="Fragment-Lighting ist Community-Konvention (LearnOpenGL & Co.), nicht von GLSL 330 vorgeschrieben — Vertex-Lighting kompiliert genauso im Core-Profile.">Stil · Konvention</span></span><b>fast wie rechts</b></summary>
       <pre class="mono"><code><span class="cm">// im Fragment-Shader (Standard seit LearnOpenGL &amp; co.):</span>
 vec3 N = normalize(Normal);
 vec3 L = normalize(lightPos - FragPos);
@@ -639,10 +681,10 @@ vec3 H = normalize(L + V);           <span class="cm">// Halfway-Vektor</span>
 <span class="kw steel">float</span> spec = pow(max(dot(N, H), 0.0), shininess);
 FragColor = vec4(ambient + diff*diffuseColor
                          + spec*specColor, 1.0);</code></pre>
-      <p class="gl-note"><strong>Hier konvergiert es:</strong> Modernes GL macht praktisch dasselbe wie astronomore — Blinn-Phong pro Fragment mit Halfway-Vektor, <code class="mono">gl_NormalMatrix</code> gibt es nicht mehr, die Normalenmatrix wird auf CPU/Shader-Seite selbst gebaut. Der Gouraud/Per-Vertex-Ansatz links ist eine Fixed-Function-Ära-Eigenheit — kein "GL vs. wgpu"-Unterschied, sondern ein "alt vs. neu"-Unterschied, der schon vor wgpu Standard wurde.</p>
+      <p class="gl-note"><strong>Hier konvergiert es, aber als Konvention, nicht als Zwang:</strong> Nichts in GLSL 330 core verbietet Vertex-Lighting — man könnte den linken Torus-Shader unverändert unter <code class="mono">#version 330 core</code> kompilieren (bis auf die entfernten Built-ins). Dass moderne Tutorials trotzdem fast immer Fragment-Shading mit Halfway-Vektor zeigen, ist gelernte Praxis der Community, keine Sprachregel. Spec-seitig ist nur <code class="mono">gl_NormalMatrix</code> wirklich weg — die Normalenmatrix muss jetzt explizit gebaut werden, egal für welchen Shading-Stil man sich entscheidet.</p>
     </details>
     <div class="panel modern">
-      <div class="panel-tag mono"><span>shader.wgsl:94–110</span><b>Blinn-Phong, pro Fragment</b></div>
+      <div class="panel-tag mono"><span class="tag-source">shader.wgsl:94–110<span class="badge stil" title="Blinn-Phong im Fragment-Shader ist astronomores eigene Entscheidung — WGSL schreibt keinen Beleuchtungsstil vor.">Stil · astronomore</span></span><b>Blinn-Phong, pro Fragment</b></div>
       <pre class="mono"><code><span class="kw teal">let</span> N = normalize(in.body_normal.xyz);
 <span class="kw teal">let</span> L = normalize(light_pos - in.body_position.xyz);
 <span class="kw teal">let</span> V = normalize(camera.camera_pos - in.body_position.xyz);
@@ -656,7 +698,7 @@ FragColor = vec4(ambient + diff*diffuseColor
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>Gouraud (Vertex) vs. Phong-Shading (Fragment) ist ein klassischer Buch-Gegensatz (Kap. 6), aber kein API-Gegensatz: Bei 128×64 Segmenten pro Kugel wäre Vertex-Shading hier vermutlich kaum vom Fragment-Ergebnis zu unterscheiden — aber die Blinn-Halfway-Formel <code class="mono">pow(dot(H,N), shininess)</code> ist zusätzlich numerisch stabiler als <code class="mono">reflect()</code> bei streifenden Winkeln, was bei der Sonne als Punktlicht direkt sichtbar wird.</p>
+    <p>Gouraud (Vertex) vs. Phong-Shading (Fragment) ist ein klassischer Buch-Gegensatz (Kap. 6), aber in keiner der drei Spalten eine API-Vorschrift — alle drei Beleuchtungs-Panels sind hier als "Stil" markiert, nicht als "Spec". Bei 128×64 Segmenten pro Kugel wäre Vertex-Shading hier vermutlich kaum vom Fragment-Ergebnis zu unterscheiden — aber die Blinn-Halfway-Formel <code class="mono">pow(dot(H,N), shininess)</code> ist zusätzlich numerisch stabiler als <code class="mono">reflect()</code> bei streifenden Winkeln, was bei der Sonne als Punktlicht direkt sichtbar wird.</p>
   </div>
 </section>
 
@@ -666,7 +708,7 @@ FragColor = vec4(ambient + diff*diffuseColor
   <p class="stage-prose">Immediate Mode setzt die aktuelle Zeichenfarbe als globalen State, der für alle folgenden <code class="mono">glVertex</code>-Aufrufe gilt, bis er erneut geändert wird. astronomore trifft dieselbe Entscheidung (Textur oder Flachfarbe) pro Fragment über ein Uniform-Flag.</p>
   <div class="compare">
     <div class="panel legacy">
-      <div class="panel-tag mono"><span>HintergrundUmschalten.java · renderLoop()</span><b>globaler Farb-State</b></div>
+      <div class="panel-tag mono"><span class="tag-source">HintergrundUmschalten.java · renderLoop()<span class="badge spec" title="glColor3d als Immediate-Mode-Zustand existiert nur im Compatibility-Profile; im Core-Profile entfernt.">Spec · Compat-Profile</span></span><b>globaler Farb-State</b></div>
       <pre class="mono"><code><span class="cm">// gilt ab hier fuer alle folgenden glVertex-Aufrufe,</span>
 <span class="cm">// bis irgendwo erneut glColor3d() aufgerufen wird:</span>
 glColor3d(0, .7 + 0.3*Math.sin(t), 0);
@@ -677,7 +719,7 @@ glBegin(GL_TRIANGLES);
 glEnd();</code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span>GLSL 330 core · kein Vorlagen-Bezug</span><b>fast wie rechts</b></summary>
+      <summary class="mono"><span class="tag-source">GLSL 330 core · kein Vorlagen-Bezug<span class="badge spec" title="texture() als Funktion ersetzt glColor3d als State-Mechanismus — das ist GLSL-330-Sprachdesign, nicht Beispiel-Stil.">Spec · GLSL 330</span></span><b>fast wie rechts</b></summary>
       <pre class="mono"><code><span class="kw steel">uniform</span> sampler2D diffuseTex;
 <span class="kw steel">uniform</span> <span class="kw steel">bool</span> useTexture;
 <span class="kw steel">uniform</span> vec3 flatColor;
@@ -685,10 +727,10 @@ glEnd();</code></pre>
 vec3 baseColor = useTexture
     ? texture(diffuseTex, TexCoord).rgb
     : flatColor;</code></pre>
-      <p class="gl-note"><strong>Fast wie rechts, ein Detail anders:</strong> Praktisch dieselbe Entscheidung wie <code class="mono">select()</code> in WGSL — nur darf Desktop-GLSL <code class="mono">texture()</code> auch in einem echten <code class="mono">if</code>/Ternary aufrufen, ohne den "uniform control flow"-Zwang, den WebGL/WGSL erzwingen (siehe Kernunterschied rechts).</p>
+      <p class="gl-note"><strong>Fast wie rechts, ein Detail anders:</strong> Praktisch dieselbe Entscheidung wie <code class="mono">select()</code> in WGSL — nur darf Desktop-GLSL <code class="mono">texture()</code> auch in einem echten <code class="mono">if</code>/Ternary aufrufen. Die zugrundeliegende Gefahr (implizite Ableitungen für Mipmap-Level brechen bei divergenten Pfaden) existiert in GLSL genauso, ist dort aber nur "undefined behaviour" laut Spec — der Treiber prüft es nicht. WGSL erzwingt und <em>validiert</em> "uniform control flow" formal (Uniformity-Analyse), GLSL verlässt sich auf Vorsicht der Autorin.</p>
     </details>
     <div class="panel modern">
-      <div class="panel-tag mono"><span>shader.wgsl:88–89</span><b>Uniform-Flag pro Fragment</b></div>
+      <div class="panel-tag mono"><span class="tag-source">shader.wgsl:88–89<span class="badge spec" title="Der Uniform-Control-Flow-Zwang um textureSample ist WGSL-Sprachdesign (Uniformity-Analyse), nicht astronomore-Stil.">Spec · WGSL</span></span><b>Uniform-Flag pro Fragment</b></div>
       <pre class="mono"><code><span class="kw teal">let</span> tex_color = textureSample(t_diffuse, s_diffuse, in.tex_coords).rgb;
 <span class="kw teal">let</span> base_color = select(
   scene_props.object_color.xyz,   <span class="cm">// wenn use_texture == 0</span>
@@ -706,10 +748,10 @@ vec3 baseColor = useTexture
 <section class="stage">
   <p class="stage-label mono"><span class="n">08</span> · shader laden</p>
   <h2>.vs/.fs-Dateipaare vs. eine validierte .wgsl-Datei</h2>
-  <p class="stage-prose">Kapitel 2 trennt Vertex- und Fragment-Shader in eigene Dateien (<code class="mono">torus*.vs</code> / <code class="mono">torus*.fs</code>). <code class="mono">ShaderUtilities.java</code> liest davon nur den Text ein und prüft <em>nach</em> dem Linken den Erfolg über einen GL-Info-Log — das eigentliche <code class="mono">glCompileShader</code>/<code class="mono">glLinkProgram</code> passiert in den jeweiligen Beispiel-Klassen selbst (hier nicht gezeigt). astronomore validiert dagegen <em>vor</em> der GPU, mit exakter Fehlerposition im Quelltext.</p>
+  <p class="stage-prose">Kapitel 2 trennt Vertex- und Fragment-Shader in eigene Dateien (<code class="mono">torus*.vs</code> / <code class="mono">torus*.fs</code>). <code class="mono">ShaderUtilities.java</code> liest davon nur den Text ein und prüft <em>nach</em> dem Linken den Erfolg über einen GL-Info-Log — das eigentliche <code class="mono">glCompileShader</code>/<code class="mono">glLinkProgram</code> passiert in den jeweiligen Beispiel-Klassen selbst (hier nicht gezeigt). Dass es überhaupt zwei getrennte Helfer-Funktionen sind (<code class="mono">readShadercode</code>, <code class="mono">testShaderProgram</code>), ist Buch-eigene Code-Organisation — die GL-Aufrufe selbst sind seit GL 2.0 unverändert. astronomore validiert dagegen <em>vor</em> der GPU, mit exakter Fehlerposition im Quelltext.</p>
   <div class="compare">
     <div class="panel legacy">
-      <div class="panel-tag mono"><span>ShaderUtilities.java:33,54–67</span><b>Text laden, Fehler erst nach dem Linken</b></div>
+      <div class="panel-tag mono"><span class="tag-source">ShaderUtilities.java:33,54–67<span class="badge spec" title="glCreateShader/glCompileShader/InfoLog gehören seit GL 2.0 zur Spec, unverändert bis heute.">Spec · GL-Shader-API (seit 2.0)</span></span><b>Text laden, Fehler erst nach dem Linken</b></div>
       <pre class="mono"><code><span class="kw amber">public static</span> String readShadercode(String file) ... {
   <span class="cm">// liest die .vs/.fs-Datei zeilenweise in einen String —</span>
   <span class="cm">// keine Prüfung, nur Text-Einlesen</span>
@@ -723,7 +765,7 @@ vec3 baseColor = useTexture
 }</code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span>GL 3.3 Core · kein Vorlagen-Bezug</span><b>gleiche Fehlerkategorie wie links</b></summary>
+      <summary class="mono"><span class="tag-source">GL 3.3 Core · kein Vorlagen-Bezug<span class="badge spec" title="Identische API zur linken Spalte — glCreateShader/glCompileShader/InfoLog seit GL 2.0 unverändert.">Spec · GL-Shader-API (seit 2.0)</span></span><b>gleiche Fehlerkategorie wie links</b></summary>
       <pre class="mono"><code><span class="kw steel">unsigned int</span> vs = glCreateShader(GL_VERTEX_SHADER);
 glShaderSource(vs, 1, &amp;src, 0);
 glCompileShader(vs);
@@ -737,7 +779,7 @@ glGetProgramiv(prog, GL_LINK_STATUS, &amp;ok);</code></pre>
       <p class="gl-note"><strong>Kein Fortschritt hier:</strong> Strukturell dieselbe Fehlerkategorie wie <code class="mono">testShaderProgram</code> — nur wird jetzt zusätzlich auch das <em>Kompilieren</em> selbst geprüft (<code class="mono">GL_COMPILE_STATUS</code>), nicht nur das Linken. Der Fehler bleibt aber ein String zur Laufzeit, keine source-span-genaue Diagnose vor dem Hochladen zur GPU wie bei <code class="mono">naga</code>.</p>
     </details>
     <div class="panel modern">
-      <div class="panel-tag mono"><span>shader_loader.rs:42–54</span><b>vor der GPU validiert</b></div>
+      <div class="panel-tag mono"><span class="tag-source">shader_loader.rs:42–54<span class="badge stil" title="wgpu nutzt naga für Shader ohnehin intern; der separate, vorgezogene validate_wgsl()-Aufruf für schöne miette-Fehler ist astronomores eigene Ergänzung.">Stil · astronomore</span></span><b>vor der GPU validiert</b></div>
       <pre class="mono"><code><span class="cm">// vor jedem create_shader_module() aufgerufen:</span>
 <span class="kw teal">pub fn</span> validate_wgsl(filename: &amp;str, source: &amp;str) -&gt; Result&lt;()&gt; {
   <span class="kw teal">let</span> module = naga::front::wgsl::parse_str(source)?;
@@ -750,7 +792,7 @@ glGetProgramiv(prog, GL_LINK_STATUS, &amp;ok);</code></pre>
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>In allen drei Welten prüft eine Hilfsfunktion den Erfolg — aber zu unterschiedlichen Zeitpunkten. GL11 und modernes GL (links, Mitte) fragen die GPU <em>nach</em> Compile <em>und</em>/oder Link, ob es geklappt hat (Fehler landet im GL-Info-Log als String). <code class="mono">validate_wgsl</code> parst und typprüft mit <code class="mono">naga</code>, <em>bevor</em> die GPU den Shader je sieht, und liefert dabei einen source-span-genauen Fehler — plus Hot-Reload nativ über <code class="mono">notify-debouncer-mini</code>, sodass ein Fehler beim Speichern sofort sichtbar wird.</p>
+    <p>In allen drei Welten prüft eine Hilfsfunktion den Erfolg — aber zu unterschiedlichen Zeitpunkten. GL11 und modernes GL (links, Mitte) fragen die GPU <em>nach</em> Compile <em>und</em>/oder Link, ob es geklappt hat (Fehler landet im GL-Info-Log als String) — das ist in beiden Fällen dieselbe, seit GL 2.0 unveränderte Spec-API. Rechts ist die Sache subtiler, als sie aussieht: wgpu nutzt <code class="mono">naga</code> ohnehin intern für <em>jeden</em> Shader, mit oder ohne <code class="mono">validate_wgsl</code> — die Bibliothek würde einen kaputten Shader also auch ohne diesen Aufruf ablehnen. Der eigentliche Mehrwert von <code class="mono">validate_wgsl</code> ist astronomores eigene Entscheidung, <code class="mono">naga</code> <em>zusätzlich, separat und vorab</em> aufzurufen, um an einen sauberen, miette-formatierten Fehler mit Source-Span zu kommen statt an wgpus eigene (deutlich kargere) Validierungsmeldung.</p>
   </div>
 </section>
 
