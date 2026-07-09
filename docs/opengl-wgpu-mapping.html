@@ -402,16 +402,26 @@ self.draw_indexed(0..cb.mesh.num_elements, 0, instances);</code></pre>
 <section class="stage">
   <p class="stage-label mono"><span class="n">04</span> · transformationskette</p>
   <h2>M = I · P · T · R · S — Stack vs. Ausdruck</h2>
-  <p class="stage-prose">Folie 41/42 zeigt die Kette <code class="mono">M=I; M*P; M*T; M*R; M*S</code> als Folge mutierender Aufrufe auf einem globalen Matrix-Stack, rückwärts gelesen. astronomore rechnet dieselbe Mathematik — aber als benannten, expliziten Ausdruck auf der CPU, der dann als fertige Matrix zur GPU hochgeladen wird.</p>
+  <p class="stage-prose">Folie 41/42 zeigt die Kette <code class="mono">M=I; M*P; M*T; M*R; M*S</code> als flache Folge mutierender Aufrufe auf einem globalen Matrix-Stack. Um sie mit der rechten Seite vergleichbar zu machen, wird sie hier <em>nicht</em> in der Reihenfolge der Folie abgetippt, sondern nach denselben drei Rollen umsortiert, die astronomore explizit benennt: Projektion, View, Modell.</p>
   <div class="compare">
     <div class="panel legacy">
-      <div class="panel-tag mono"><span>FlaecheSchwingt.java:46–58</span><b>impliziter Matrix-Stack</b></div>
-      <pre class="mono"><code>glLoadIdentity();                    <span class="cm">// M=I</span>
-glFrustum(-1,1, -1,1, 3,10);         <span class="cm">// M*P</span>
-glTranslated(0, 0, -4);              <span class="cm">// M*T</span>
-glRotatef(sin(t)*120f, 0,1,0);       <span class="cm">// M*R</span>
-glScaled(0.8, 0.8, 0.8);             <span class="cm">// M*S</span>
-POGL.renderViereck();                <span class="cm">// v' = M*v, pro Vertex</span></code></pre>
+      <div class="panel-tag mono"><span>FlaecheSchwingt.java:46–58, umsortiert</span><b>ein Stack, drei Rollen</b></div>
+      <pre class="mono"><code>glLoadIdentity();                       <span class="cm">// M = I</span>
+
+<span class="cm">// Projektion (Kamera- -&gt; Clip-Space):</span>
+glFrustum(-1,1, -1,1, 3,10);            <span class="cm">// M = M*P</span>
+
+<span class="cm">// View (Welt- -&gt; Kamera-Space): fehlt hier ganz —</span>
+<span class="cm">// die Kamera steht fest im Ursprung, es gibt keinen</span>
+<span class="cm">// glTranslate/glRotate fuer eine Kamera. View = I,</span>
+<span class="cm">// bleibt im Stack unsichtbar.</span>
+
+<span class="cm">// Modell (Objekt- -&gt; Welt-Space):</span>
+glTranslated(0, 0, -4);                 <span class="cm">// M = M*T</span>
+glRotatef(sin(t)*120f, 0,1,0);          <span class="cm">// M = M*R</span>
+glScaled(0.8, 0.8, 0.8);                <span class="cm">// M = M*S</span>
+
+POGL.renderViereck();  <span class="cm">// v' = M*v = P*(T*R*S)*v, pro Vertex</span></code></pre>
     </div>
     <div class="panel modern">
       <div class="panel-tag mono"><span>camera.rs:163–164,382–384 · celestial_body.rs:24–26</span><b>explizite glam-Ausdrücke</b></div>
@@ -433,7 +443,7 @@ self.view_proj = (proj * view).to_cols_array_2d();
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>Die Reihenfolge-Logik ("rechts wirkt zuerst") ist identisch — das ist dieselbe Mathematik, nur in zwei getrennte Ausdrücke aufgeteilt: <code class="mono">proj * view</code> für Kamera→Clip-Space (einmal pro Frame in <code class="mono">CameraUniform::update_view_proj</code>) und <code class="mono">world * spin * scale</code> für Objekt→Welt-Space (einmal pro Körper in <code class="mono">ModelUniform::new</code>). GL11 mutiert einen einzigen unsichtbaren globalen Stack mit Seiteneffekt-Aufrufen; glam multipliziert benannte <code class="mono">Mat4</code>-Werte zu Ausdrücken, die nichts Globales anfassen und sich debuggen/testen lassen, bevor sie die GPU überhaupt erreichen.</p>
+    <p>Die Reihenfolge-Logik ("rechts wirkt zuerst") ist identisch — das ist dieselbe Mathematik. Der eigentliche Unterschied zeigt sich erst, wenn man beide Seiten in dieselben drei Rollen sortiert: astronomore hat für View und Modell <em>zwei getrennte, benannte</em> Ausdrücke (<code class="mono">proj * view</code> einmal pro Frame in <code class="mono">CameraUniform::update_view_proj</code>, <code class="mono">world * spin * scale</code> einmal pro Körper in <code class="mono">ModelUniform::new</code>) — GL11 dagegen kennt diese Trennung als Konzept gar nicht: Der Fixed-Function-Stack heißt nicht zufällig <code class="mono">GL_MODELVIEW</code> (im Gegensatz zu <code class="mono">GL_PROJECTION</code>) — View und Modell sind von Anfang an <em>ein</em> Stack, ein Name, eine Matrix. Im Beispiel oben fällt die View sogar ganz weg (Kamera fest im Ursprung), was im Code unsichtbar bleibt; man kann ihm nicht ansehen, ob <code class="mono">glTranslated(0,0,-4)</code> "die Kamera wegbewegen" oder "das Objekt platzieren" bedeutet — beides läuft im selben Stack. glam erzwingt diese Unterscheidung von Anfang an, weil <code class="mono">view</code> und <code class="mono">model</code> zwei separate Variablen mit eigenem Typ sind.</p>
   </div>
 </section>
 
