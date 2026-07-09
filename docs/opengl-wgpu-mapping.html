@@ -321,6 +321,34 @@
     margin-top: 0.6rem;
   }
 
+  .disclaimer {
+    max-width: 900px;
+    margin: 0 0 3rem;
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--amber);
+    border-left-width: 4px;
+    border-radius: 5px;
+    background: var(--amber-soft);
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+  .disclaimer .d-label {
+    display: block;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, "Liberation Mono", monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--amber);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+  .disclaimer p { margin: 0; }
+  .disclaimer p + p { margin-top: 0.6rem; }
+  .disclaimer ul { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+  .disclaimer li { margin-bottom: 0.3rem; }
+  .disclaimer .trust-high { color: var(--teal); font-weight: 600; }
+  .disclaimer .trust-low { color: var(--amber); font-weight: 600; }
+
   footer {
     max-width: 900px;
     margin-top: 4rem;
@@ -352,6 +380,17 @@
     Wahl der Fenster-Bibliothek/des Buchs/des Projekts, austauschbar ohne Versionswechsel.
   </p>
 </header>
+
+<div class="disclaimer">
+  <span class="d-label">⚠ Ehrlichkeit zur Entstehung &amp; zum Vertrauensgrad</span>
+  <p>Diese Gegenüberstellung ist zum großen Teil <strong>mit einem KI-Assistenten (Claude) erstellt</strong> und dient mir vor allem als Lern- und Vortragsmaterial. Der Vertrauensgrad ist über die drei Spalten <em>nicht</em> gleich:</p>
+  <ul>
+    <li><span class="trust-high">Rechte Spalte (astronomore / wgpu):</span> gegen den echten Projekt-Code geprüft — die <code class="mono">datei:zeile</code>-Verweise stimmen und stammen aus meinem eigenen Code, den ich verstehe.</li>
+    <li><span class="trust-high">Linke Spalte (Dino-Buch / GL11):</span> basiert auf dem tatsächlichen Buch-/Foliencode, den wir im Kurs behandelt haben.</li>
+    <li><span class="trust-low">Mittlere Spalte (modernes OpenGL 3.3+):</span> allgemeines, <strong>KI-generiertes Wissen, das ich selbst nicht aus eigener Praxis kenne</strong> und nicht kompiliert/verifiziert habe. Bitte als grobe Orientierung lesen, nicht als geprüfte Referenz.</li>
+  </ul>
+  <p>Auch die <strong>Spec-/Stil-Einordnungen und die „Kernunterschied"-Erklärtexte sind überwiegend KI-formuliert und nicht durchgängig gegengeprüft.</strong> Wo etwas für eine Prüfung oder Präsentation zählt, gilt: erst an der Primärquelle (Spec, Buch, echter Code) nachschlagen. Diese Offenlegung ist bewusster Teil meiner Reflexion zur KI-Nutzung im Projekt.</p>
+</div>
 
 <section class="stage">
   <p class="stage-label mono"><span class="n">01</span> · fenster &amp; render-loop</p>
