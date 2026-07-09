@@ -13,6 +13,8 @@
     --amber-soft: rgba(185, 121, 58, 0.13);
     --teal: #3f9c93;
     --teal-soft: rgba(63, 156, 147, 0.13);
+    --steel: #5b84a8;
+    --steel-soft: rgba(91, 132, 168, 0.13);
     --rule: rgba(139, 147, 161, 0.28);
     --code-bg: rgba(0, 0, 0, 0.22);
     --code-bg-light: rgba(0, 0, 0, 0.045);
@@ -69,7 +71,7 @@
   }
 
   .page {
-    max-width: 900px;
+    max-width: 1180px;
     margin: 0 auto;
     padding: 4.5rem 1.75rem 6rem;
   }
@@ -87,6 +89,7 @@
   .page::before { content: none; }
 
   header.masthead {
+    max-width: 900px;
     margin-bottom: 3.5rem;
     padding-bottom: 2rem;
     border-bottom: 1px solid var(--rule);
@@ -146,10 +149,14 @@
   }
   .chip.amber { background: var(--amber); }
   .chip.teal { background: var(--teal); }
+  .chip.steel { background: var(--steel); }
+  .legend-item .hint { color: var(--muted); font-style: italic; }
 
   section.stage {
     margin: 3.6rem 0;
+    max-width: 900px;
   }
+  section.stage:has(.compare:has(.modern-gl)) { max-width: none; }
   section.stage:first-of-type { margin-top: 0; }
 
   .stage-label {
@@ -177,11 +184,11 @@
 
   .compare {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 1.1rem;
-    align-items: stretch;
+    align-items: start;
   }
-  @media (max-width: 680px) {
+  @media (max-width: 900px) {
     .compare { grid-template-columns: 1fr; }
   }
 
@@ -195,6 +202,7 @@
   }
   .panel.legacy { border-left: 3px solid var(--amber); }
   .panel.modern { border-left: 3px solid var(--teal); }
+  .panel.modern-gl { border-left: 3px solid var(--steel); }
 
   .panel-tag {
     font-size: 0.72rem;
@@ -206,6 +214,40 @@
     gap: 0.5rem;
   }
   .panel-tag b { color: var(--text); font-weight: 600; }
+
+  .panel.modern-gl > summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    padding: 0.6rem 0.9rem 0.5rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .panel.modern-gl > summary::-webkit-details-marker { display: none; }
+  .panel.modern-gl > summary::before {
+    content: "▸";
+    color: var(--steel);
+    margin-right: 0.5rem;
+    display: inline-block;
+    transition: transform 0.15s ease;
+  }
+  .panel.modern-gl[open] > summary::before { transform: rotate(90deg); }
+  .panel.modern-gl > summary b { color: var(--text); font-weight: 600; }
+  .panel.modern-gl > summary:focus-visible {
+    outline: 2px solid var(--steel);
+    outline-offset: -2px;
+  }
+  .panel.modern-gl .gl-note {
+    margin: 0;
+    padding: 0 0.9rem 0.9rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .panel.modern-gl .gl-note strong { color: var(--text); }
 
   pre {
     margin: 0;
@@ -219,6 +261,7 @@
   .cm { color: var(--muted); font-style: italic; }
   .kw.amber { color: var(--amber); }
   .kw.teal { color: var(--teal); }
+  .kw.steel { color: var(--steel); }
 
   .callout {
     margin-top: 1.1rem;
@@ -226,6 +269,7 @@
     background: var(--panel);
     border-radius: 5px;
     font-size: 0.92rem;
+    max-width: 66ch;
   }
   .callout .label {
     font-size: 0.72rem;
@@ -245,6 +289,7 @@
   }
 
   footer {
+    max-width: 900px;
     margin-top: 4rem;
     padding-top: 1.5rem;
     border-top: 1px solid var(--rule);
@@ -263,6 +308,7 @@
   <p class="dek">Wie die Dino-Buch-Beispiele (Kap. 1–2, LWJGL/GL11) dieselben Probleme lösen wie <strong>astronomore</strong> — nur mit dreißig Jahren Architektur dazwischen. Eine Stufe-für-Stufe-Gegenüberstellung entlang der Rendering-Pipeline.</p>
   <div class="legend">
     <div class="legend-item"><span class="chip amber"></span> Java / LWJGL — GL11 fixed-function &amp; #version 130 GLSL</div>
+    <div class="legend-item"><span class="chip steel"></span> Modernes OpenGL (3.3+ Core / GLSL 330) <span class="hint">— zum Aufklappen anklicken</span></div>
     <div class="legend-item"><span class="chip teal"></span> Rust — wgpu 29 / WGSL (astronomore)</div>
   </div>
 </header>
@@ -290,6 +336,22 @@ Display.destroy();
                         <span class="cm">// naechsten Iteration</span>
 }</code></pre>
     </div>
+    <details class="panel modern-gl">
+      <summary class="mono"><span>GLFW · kein Vorlagen-Bezug</span><b>gleiche Architektur wie links</b></summary>
+      <pre class="mono"><code>GLFWwindow* window = glfwCreateWindow(800, 600, "GL", 0, 0);
+glfwMakeContextCurrent(window);
+gladLoadGLLoader(...);  <span class="cm">// Funktionszeiger laden —</span>
+                         <span class="cm">// OpenGL selbst hat keine echte API</span>
+
+<span class="kw steel">while</span> (!glfwWindowShouldClose(window)) {
+    <span class="kw steel">float</span> t = glfwGetTime();
+    <span class="cm">// ... Zustand setzen, zeichnen ...</span>
+    glfwSwapBuffers(window);   <span class="cm">// swap</span>
+    glfwPollEvents();          <span class="cm">// Events pollen</span>
+}
+glfwTerminate();</code></pre>
+      <p class="gl-note"><strong>Kein Fortschritt hier:</strong> Moderne Desktop-GL-Tutorials (GLFW/SDL) nutzen strukturell dieselbe App-eigene <code class="mono">while</code>-Schleife wie das Dino-Buch — nur der Fenster-Layer ist ausgetauscht. Der Sprung "App besitzt die Schleife" → "Bibliothek besitzt die Schleife" ist spezifisch der wgpu/winit-Schnitt, keine Konsequenz aus Shadern oder Core-Profile.</p>
+    </details>
     <div class="panel modern">
       <div class="panel-tag mono"><span>lib.rs:1519, 1446, 296</span><b>run_app() — Schleife in winit, wir nur Callback</b></div>
       <pre class="mono"><code><span class="cm">// run() — DIES ist die eigentliche Schleife,</span>
@@ -319,7 +381,7 @@ self.gpu.window.request_redraw();
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>Die Schleife verschwindet nicht — sie wandert nur aus unserem Code heraus in die Bibliothek. LWJGL: wir schreiben <code class="mono">while(...)</code> und rufen <code class="mono">Display.update()</code> selbst am Ende jeder Iteration auf. winit: <code class="mono">event_loop.run_app()</code> ist die Schleife, und wir lösen die nächste Runde nicht durch eigenen Code-Fluss aus, sondern indem wir <em>innerhalb</em> des aktuellen Callback-Aufrufs <code class="mono">request_redraw()</code> rufen — eine Art "meld mich für die nächste Runde an", bevor winit weiterschaltet. Der Vorteil: dieselbe Schleife kann daneben auch Tastatur-/Maus-Events, Resize und (auf WASM) den Browser-eigenen <code class="mono">requestAnimationFrame</code>-Takt bedienen, ohne dass unser Code das koordinieren müsste.</p>
+    <p>Die Schleife verschwindet nicht — sie wandert nur aus unserem Code heraus in die Bibliothek. LWJGL <em>und</em> modernes GLFW-basiertes GL: wir schreiben <code class="mono">while(...)</code> und rufen <code class="mono">glfwSwapBuffers()</code>/<code class="mono">Display.update()</code> selbst am Ende jeder Iteration auf. winit: <code class="mono">event_loop.run_app()</code> ist die Schleife, und wir lösen die nächste Runde nicht durch eigenen Code-Fluss aus, sondern indem wir <em>innerhalb</em> des aktuellen Callback-Aufrufs <code class="mono">request_redraw()</code> rufen — eine Art "meld mich für die nächste Runde an", bevor winit weiterschaltet. Der Vorteil: dieselbe Schleife kann daneben auch Tastatur-/Maus-Events, Resize und (auf WASM) den Browser-eigenen <code class="mono">requestAnimationFrame</code>-Takt bedienen, ohne dass unser Code das koordinieren müsste.</p>
   </div>
 </section>
 
@@ -336,6 +398,14 @@ self.gpu.window.request_redraw();
   glClear(GL_COLOR_BUFFER_BIT);
 }</code></pre>
     </div>
+    <details class="panel modern-gl">
+      <summary class="mono"><span>GL 3.3 Core · kein Vorlagen-Bezug</span><b>unverändert zu links</b></summary>
+      <pre class="mono"><code>glClearColor(0.95f, 0.95f, 0.95f, 1.0f);
+glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+<span class="cm">// meist mit Tiefenpuffer kombiniert, aber sonst</span>
+<span class="cm">// 1:1 dieselben zwei Aufrufe wie im Fixed-Function-Beispiel</span></code></pre>
+      <p class="gl-note"><strong>Kein Fortschritt hier:</strong> <code class="mono">glClearColor</code>/<code class="mono">glClear</code> gehören zu den wenigen Fixed-Function-Resten, die das Core-Profile unverändert übernommen hat — Clearing ist API-seitig nie "shaderpflichtig" geworden.</p>
+    </details>
     <div class="panel modern">
       <div class="panel-tag mono"><span>lib.rs:341–367</span><b>RenderPassDescriptor</b></div>
       <pre class="mono"><code>RenderPassColorAttachment {
@@ -378,6 +448,27 @@ depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
   <span class="cm">// ... 5 weitere Seiten, jeden Frame neu</span>
 glEnd();</code></pre>
     </div>
+    <details class="panel modern-gl">
+      <summary class="mono"><span>GL 3.3 Core · kein Vorlagen-Bezug</span><b>fast wie rechts</b></summary>
+      <pre class="mono"><code><span class="cm">// einmalig:</span>
+<span class="kw steel">unsigned int</span> VAO, VBO, EBO;
+glGenVertexArrays(1, &amp;VAO);
+glGenBuffers(1, &amp;VBO);
+glGenBuffers(1, &amp;EBO);
+glBindVertexArray(VAO);
+glBindBuffer(GL_ARRAY_BUFFER, VBO);
+glBufferData(GL_ARRAY_BUFFER, size, vertices, GL_STATIC_DRAW);
+glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, indices, GL_STATIC_DRAW);
+glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, 0);
+glEnableVertexAttribArray(0);
+<span class="cm">// ... weitere Attribute: UV, Normal ...</span>
+
+<span class="cm">// pro Frame, nur noch binden + zeichnen:</span>
+glBindVertexArray(VAO);
+glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, 0);</code></pre>
+      <p class="gl-note"><strong>Hier konvergiert es:</strong> VAO/VBO/EBO sind praktisch dieselbe Architektur wie Vertex-/Index-Buffer in wgpu — einmal hochladen, pro Frame nur binden. Der Immediate-Mode → Buffer-Sprung ist der eigentliche "moderne" Schnitt in der GPU-Programmierung insgesamt, nicht etwas, das erst mit wgpu kommt. Nur die Typsicherheit (Layout wird zur Compile-Zeit geprüft statt per <code class="mono">glVertexAttribPointer</code>-Offset von Hand) ist wgpu-spezifisch.</p>
+    </details>
     <div class="panel modern">
       <div class="panel-tag mono"><span>mesh.rs:123 · celestial_body.rs:204–216</span><b>einmalig hochladen, pro Frame nur binden</b></div>
       <pre class="mono"><code><span class="cm">// einmalig, beim Erzeugen des Körpers (mesh.rs:123):</span>
@@ -423,6 +514,24 @@ glScaled(0.8, 0.8, 0.8);                <span class="cm">// M = M*S</span>
 
 POGL.renderViereck();  <span class="cm">// v' = M*v = P*(T*R*S)*v, pro Vertex</span></code></pre>
     </div>
+    <details class="panel modern-gl">
+      <summary class="mono"><span>GLM · kein Vorlagen-Bezug</span><b>fast wie rechts</b></summary>
+      <pre class="mono"><code><span class="cm">// Stack faellt im Core-Profile komplett weg —</span>
+<span class="cm">// glLoadIdentity/glFrustum/glTranslate sind deprecated.</span>
+<span class="cm">// Stattdessen CPU-seitige Matrizen (hier: GLM):</span>
+
+glm::mat4 projection = glm::perspective(
+    glm::radians(45.0f), aspect, 0.1f, 100.0f);
+glm::mat4 view = glm::lookAt(camPos, target, glm::vec3(0,1,0));
+glm::mat4 model = glm::translate(glm::mat4(1.0f), pos)
+                 * glm::rotate(glm::mat4(1.0f), angle, axis)
+                 * glm::scale(glm::mat4(1.0f), glm::vec3(radius));
+
+glUniformMatrix4fv(loc("view"), 1, GL_FALSE, glm::value_ptr(view));
+glUniformMatrix4fv(loc("projection"), 1, GL_FALSE, ...);
+glUniformMatrix4fv(loc("model"), 1, GL_FALSE, ...);</code></pre>
+      <p class="gl-note"><strong>Hier konvergiert es:</strong> GLM ist absichtlich API-kompatibel zu genau diesem Stil gebaut (<code class="mono">perspective</code>/<code class="mono">lookAt</code>/<code class="mono">translate</code>/<code class="mono">rotate</code>/<code class="mono">scale</code> als benannte Funktionen auf <code class="mono">mat4</code>-Werten) — praktisch derselbe Ansatz wie <code class="mono">glam</code> rechts, nur in C++ und mit String-basiertem <code class="mono">glGetUniformLocation</code>-Lookup statt nummerierten Bind Groups. Die Sprache wechselt, das Konzept "explizite CPU-Matrix statt globalem Stack" nicht.</p>
+    </details>
     <div class="panel modern">
       <div class="panel-tag mono"><span>camera.rs:163–164,382–384 · celestial_body.rs:24–26</span><b>explizite glam-Ausdrücke</b></div>
       <pre class="mono"><code><span class="cm">// Projektion, camera.rs:164 (Kamera- -&gt; Clip-Space):</span>
@@ -443,7 +552,7 @@ self.view_proj = (proj * view).to_cols_array_2d();
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>Die Reihenfolge-Logik ("rechts wirkt zuerst") ist identisch — das ist dieselbe Mathematik. Der eigentliche Unterschied zeigt sich erst, wenn man beide Seiten in dieselben drei Rollen sortiert: astronomore hat für View und Modell <em>zwei getrennte, benannte</em> Ausdrücke (<code class="mono">proj * view</code> einmal pro Frame in <code class="mono">CameraUniform::update_view_proj</code>, <code class="mono">world * spin * scale</code> einmal pro Körper in <code class="mono">ModelUniform::new</code>) — GL11 dagegen kennt diese Trennung als Konzept gar nicht: Der Fixed-Function-Stack heißt nicht zufällig <code class="mono">GL_MODELVIEW</code> (im Gegensatz zu <code class="mono">GL_PROJECTION</code>) — View und Modell sind von Anfang an <em>ein</em> Stack, ein Name, eine Matrix. Im Beispiel oben fällt die View sogar ganz weg (Kamera fest im Ursprung), was im Code unsichtbar bleibt; man kann ihm nicht ansehen, ob <code class="mono">glTranslated(0,0,-4)</code> "die Kamera wegbewegen" oder "das Objekt platzieren" bedeutet — beides läuft im selben Stack. glam erzwingt diese Unterscheidung von Anfang an, weil <code class="mono">view</code> und <code class="mono">model</code> zwei separate Variablen mit eigenem Typ sind.</p>
+    <p>Die Reihenfolge-Logik ("rechts wirkt zuerst") ist identisch — das ist dieselbe Mathematik. Der eigentliche Unterschied zeigt sich erst, wenn man beide Seiten in dieselben drei Rollen sortiert: astronomore hat für View und Modell <em>zwei getrennte, benannte</em> Ausdrücke (<code class="mono">proj * view</code> einmal pro Frame in <code class="mono">CameraUniform::update_view_proj</code>, <code class="mono">world * spin * scale</code> einmal pro Körper in <code class="mono">ModelUniform::new</code>) — GL11 dagegen kennt diese Trennung als Konzept gar nicht: Der Fixed-Function-Stack heißt nicht zufällig <code class="mono">GL_MODELVIEW</code> (im Gegensatz zu <code class="mono">GL_PROJECTION</code>) — View und Modell sind von Anfang an <em>ein</em> Stack, ein Name, eine Matrix. Im Beispiel oben fällt die View sogar ganz weg (Kamera fest im Ursprung), was im Code unsichtbar bleibt; man kann ihm nicht ansehen, ob <code class="mono">glTranslated(0,0,-4)</code> "die Kamera wegbewegen" oder "das Objekt platzieren" bedeutet — beides läuft im selben Stack. glam erzwingt diese Unterscheidung von Anfang an, weil <code class="mono">view</code> und <code class="mono">model</code> zwei separate Variablen mit eigenem Typ sind. Modernes GL (Mitte) trifft dieselbe Entscheidung wie astronomore — der Stack ist also ein Fixed-Function-Merkmal, kein "OpenGL vs. wgpu"-Merkmal.</p>
   </div>
 </section>
 
@@ -464,6 +573,25 @@ self.view_proj = (proj * view).to_cols_array_2d();
                 * gl_Vertex;                 <span class="cm">// woher?</span>
 }</code></pre>
     </div>
+    <details class="panel modern-gl">
+      <summary class="mono"><span>GLSL 330 core · kein Vorlagen-Bezug</span><b>fast wie rechts</b></summary>
+      <pre class="mono"><code>#version 330 core
+<span class="kw steel">layout</span>(location=0) <span class="kw steel">in</span> vec3 aPos;
+<span class="kw steel">layout</span>(location=1) <span class="kw steel">in</span> vec2 aTexCoord;
+<span class="kw steel">layout</span>(location=2) <span class="kw steel">in</span> vec3 aNormal;
+
+<span class="kw steel">uniform</span> mat4 model, view, projection;
+
+<span class="kw steel">out</span> vec3 Normal;
+<span class="kw steel">out</span> vec3 FragPos;
+
+<span class="kw steel">void</span> main() {
+  FragPos = vec3(model * vec4(aPos, 1.0));
+  Normal  = mat3(transpose(inverse(model))) * aNormal;
+  gl_Position = projection * view * vec4(FragPos, 1.0);
+}</code></pre>
+      <p class="gl-note"><strong>Hier konvergiert es fast:</strong> <code class="mono">gl_ModelViewProjectionMatrix</code> ist im Core-Profile komplett verschwunden — Position, Uniforms und Normale müssen genauso explizit deklariert werden wie in WGSL. Der Unterschied zu rechts ist nur die <em>Bindung</em>: <code class="mono">glGetUniformLocation(program, "model")</code> ist ein loser String-Lookup ohne Layout-Prüfung zur Compile-Zeit — im Gegensatz zu WGSLs nummerierten <code class="mono">@group</code>/<code class="mono">@binding</code>, die <code class="mono">naga</code> vorab validiert.</p>
+    </details>
     <div class="panel modern">
       <div class="panel-tag mono"><span>shader.wgsl:1–42</span><b>explizite Bind Groups</b></div>
       <pre class="mono"><code><span class="cm">// group 1: Kamera</span>
@@ -477,7 +605,7 @@ self.view_proj = (proj * view).to_cols_array_2d();
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>Nichts kommt "von irgendwoher": jede Bind Group in astronomore hat eine feste, dokumentierte Nummer (0 Textur, 1 Kamera, 2 Modell, 3 Szene-Eigenschaften — siehe Kommentar oben in <code class="mono">shader.wgsl</code>). Der Preis dafür ist mehr Boilerplate; der Gewinn ist, dass der Shader unabhängig vom Rest der Pipeline lesbar und typgeprüft ist (<code class="mono">naga</code>-Validierung statt Laufzeit-Crash).</p>
+    <p>Nichts kommt "von irgendwoher": jede Bind Group in astronomore hat eine feste, dokumentierte Nummer (0 Textur, 1 Kamera, 2 Modell, 3 Szene-Eigenschaften — siehe Kommentar oben in <code class="mono">shader.wgsl</code>). Der Preis dafür ist mehr Boilerplate; der Gewinn ist, dass der Shader unabhängig vom Rest der Pipeline lesbar und typgeprüft ist (<code class="mono">naga</code>-Validierung statt Laufzeit-Crash). Modernes GLSL (Mitte) löst das "woher?"-Problem schon — nur die Absicherung dagegen bleibt schwächer als bei WGSL.</p>
   </div>
 </section>
 
@@ -499,6 +627,20 @@ color = vec4(1) * (ambient + diffuse*diffuseWeight
                           + specular*specularWeight);
 <span class="cm">// -&gt; als "flat" color interpoliert, .fs gibt sie nur aus</span></code></pre>
     </div>
+    <details class="panel modern-gl">
+      <summary class="mono"><span>GLSL 330 core · kein Vorlagen-Bezug</span><b>fast wie rechts</b></summary>
+      <pre class="mono"><code><span class="cm">// im Fragment-Shader (Standard seit LearnOpenGL &amp; co.):</span>
+vec3 N = normalize(Normal);
+vec3 L = normalize(lightPos - FragPos);
+vec3 V = normalize(viewPos - FragPos);
+vec3 H = normalize(L + V);           <span class="cm">// Halfway-Vektor</span>
+
+<span class="kw steel">float</span> diff = max(dot(N, L), 0.0);
+<span class="kw steel">float</span> spec = pow(max(dot(N, H), 0.0), shininess);
+FragColor = vec4(ambient + diff*diffuseColor
+                         + spec*specColor, 1.0);</code></pre>
+      <p class="gl-note"><strong>Hier konvergiert es:</strong> Modernes GL macht praktisch dasselbe wie astronomore — Blinn-Phong pro Fragment mit Halfway-Vektor, <code class="mono">gl_NormalMatrix</code> gibt es nicht mehr, die Normalenmatrix wird auf CPU/Shader-Seite selbst gebaut. Der Gouraud/Per-Vertex-Ansatz links ist eine Fixed-Function-Ära-Eigenheit — kein "GL vs. wgpu"-Unterschied, sondern ein "alt vs. neu"-Unterschied, der schon vor wgpu Standard wurde.</p>
+    </details>
     <div class="panel modern">
       <div class="panel-tag mono"><span>shader.wgsl:94–110</span><b>Blinn-Phong, pro Fragment</b></div>
       <pre class="mono"><code><span class="kw teal">let</span> N = normalize(in.body_normal.xyz);
@@ -514,7 +656,7 @@ color = vec4(1) * (ambient + diffuse*diffuseWeight
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>Gouraud (Vertex) vs. Phong-Shading (Fragment) ist ein klassischer Buch-Gegensatz (Kap. 6). Bei 128×64 Segmenten pro Kugel wäre Vertex-Shading hier vermutlich kaum vom Fragment-Ergebnis zu unterscheiden — aber die Blinn-Halfway-Formel <code class="mono">pow(dot(H,N), shininess)</code> ist zusätzlich numerisch stabiler als <code class="mono">reflect()</code> bei streifenden Winkeln, was bei der Sonne als Punktlicht direkt sichtbar wird.</p>
+    <p>Gouraud (Vertex) vs. Phong-Shading (Fragment) ist ein klassischer Buch-Gegensatz (Kap. 6), aber kein API-Gegensatz: Bei 128×64 Segmenten pro Kugel wäre Vertex-Shading hier vermutlich kaum vom Fragment-Ergebnis zu unterscheiden — aber die Blinn-Halfway-Formel <code class="mono">pow(dot(H,N), shininess)</code> ist zusätzlich numerisch stabiler als <code class="mono">reflect()</code> bei streifenden Winkeln, was bei der Sonne als Punktlicht direkt sichtbar wird.</p>
   </div>
 </section>
 
@@ -534,6 +676,17 @@ glBegin(GL_TRIANGLES);
   glVertex3d(0.3*Math.sin(t*2), .5f, 0);
 glEnd();</code></pre>
     </div>
+    <details class="panel modern-gl">
+      <summary class="mono"><span>GLSL 330 core · kein Vorlagen-Bezug</span><b>fast wie rechts</b></summary>
+      <pre class="mono"><code><span class="kw steel">uniform</span> sampler2D diffuseTex;
+<span class="kw steel">uniform</span> <span class="kw steel">bool</span> useTexture;
+<span class="kw steel">uniform</span> vec3 flatColor;
+
+vec3 baseColor = useTexture
+    ? texture(diffuseTex, TexCoord).rgb
+    : flatColor;</code></pre>
+      <p class="gl-note"><strong>Fast wie rechts, ein Detail anders:</strong> Praktisch dieselbe Entscheidung wie <code class="mono">select()</code> in WGSL — nur darf Desktop-GLSL <code class="mono">texture()</code> auch in einem echten <code class="mono">if</code>/Ternary aufrufen, ohne den "uniform control flow"-Zwang, den WebGL/WGSL erzwingen (siehe Kernunterschied rechts).</p>
+    </details>
     <div class="panel modern">
       <div class="panel-tag mono"><span>shader.wgsl:88–89</span><b>Uniform-Flag pro Fragment</b></div>
       <pre class="mono"><code><span class="kw teal">let</span> tex_color = textureSample(t_diffuse, s_diffuse, in.tex_coords).rgb;
@@ -569,6 +722,20 @@ glEnd();</code></pre>
   glGetProgramInfoLog(shader, errorBuffer, infoBuffer);
 }</code></pre>
     </div>
+    <details class="panel modern-gl">
+      <summary class="mono"><span>GL 3.3 Core · kein Vorlagen-Bezug</span><b>gleiche Fehlerkategorie wie links</b></summary>
+      <pre class="mono"><code><span class="kw steel">unsigned int</span> vs = glCreateShader(GL_VERTEX_SHADER);
+glShaderSource(vs, 1, &amp;src, 0);
+glCompileShader(vs);
+glGetShaderiv(vs, GL_COMPILE_STATUS, &amp;ok);
+<span class="kw steel">if</span> (!ok) glGetShaderInfoLog(vs, 512, 0, log);  <span class="cm">// String</span>
+
+<span class="kw steel">unsigned int</span> prog = glCreateProgram();
+glAttachShader(prog, vs); glAttachShader(prog, fs);
+glLinkProgram(prog);
+glGetProgramiv(prog, GL_LINK_STATUS, &amp;ok);</code></pre>
+      <p class="gl-note"><strong>Kein Fortschritt hier:</strong> Strukturell dieselbe Fehlerkategorie wie <code class="mono">testShaderProgram</code> — nur wird jetzt zusätzlich auch das <em>Kompilieren</em> selbst geprüft (<code class="mono">GL_COMPILE_STATUS</code>), nicht nur das Linken. Der Fehler bleibt aber ein String zur Laufzeit, keine source-span-genaue Diagnose vor dem Hochladen zur GPU wie bei <code class="mono">naga</code>.</p>
+    </details>
     <div class="panel modern">
       <div class="panel-tag mono"><span>shader_loader.rs:42–54</span><b>vor der GPU validiert</b></div>
       <pre class="mono"><code><span class="cm">// vor jedem create_shader_module() aufgerufen:</span>
@@ -583,7 +750,7 @@ glEnd();</code></pre>
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>In beiden Welten prüft eine Hilfsfunktion den Erfolg — aber zu unterschiedlichen Zeitpunkten in der Pipeline. <code class="mono">testShaderProgram</code> fragt die GPU <em>nach</em> Compile <em>und</em> Link, ob es geklappt hat (Fehler landet im GL-Info-Log). <code class="mono">validate_wgsl</code> parst und typprüft mit <code class="mono">naga</code>, <em>bevor</em> die GPU den Shader je sieht, und liefert dabei einen source-span-genauen Fehler statt eines Log-Strings — plus Hot-Reload nativ über <code class="mono">notify-debouncer-mini</code>, sodass ein Fehler beim Speichern sofort sichtbar wird.</p>
+    <p>In allen drei Welten prüft eine Hilfsfunktion den Erfolg — aber zu unterschiedlichen Zeitpunkten. GL11 und modernes GL (links, Mitte) fragen die GPU <em>nach</em> Compile <em>und</em>/oder Link, ob es geklappt hat (Fehler landet im GL-Info-Log als String). <code class="mono">validate_wgsl</code> parst und typprüft mit <code class="mono">naga</code>, <em>bevor</em> die GPU den Shader je sieht, und liefert dabei einen source-span-genauen Fehler — plus Hot-Reload nativ über <code class="mono">notify-debouncer-mini</code>, sodass ein Fehler beim Speichern sofort sichtbar wird.</p>
   </div>
 </section>
 
@@ -592,8 +759,9 @@ glEnd();</code></pre>
   <ul>
     <li>Folien: <span class="mono">Grundlegendes_zu_OpenGL.pdf</span>, S. 29–45 (Dreieck, LWJGLBasisFenster, Transformationsketten, POGL)</li>
     <li>Java: <span class="mono">kapitel01/FlaecheSchwingt.java</span>, <span class="mono">kapitel01/HintergrundUmschalten.java</span>, <span class="mono">kapitel01/POGL.java</span>, <span class="mono">kapitel02/ShaderUtilities.java</span></li>
-    <li>GLSL: <span class="mono">shader/torusambientdiffusespecularfinal.{vs,fs}</span></li>
+    <li>GLSL (Buch): <span class="mono">shader/torusambientdiffusespecularfinal.{vs,fs}</span></li>
     <li>Rust/WGSL: <span class="mono">src/lib.rs</span>, <span class="mono">src/camera.rs</span>, <span class="mono">src/celestial_body.rs</span>, <span class="mono">src/mesh.rs</span>, <span class="mono">src/shader_loader.rs</span>, <span class="mono">src/shaders/shader.wgsl</span></li>
+    <li>Modernes OpenGL (mittlere, einklappbare Spalte): allgemeines GL-3.3-Core/GLSL-330-Wissen (GLFW, VAO/VBO, GLM, <code class="mono">glCreateShader</code>-Workflow) — <strong>keine Vorlage im Projekt oder Dino-Buch</strong>, zum Einordnen ergänzt.</li>
   </ul>
 </footer>
 
