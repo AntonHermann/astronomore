@@ -1,0 +1,543 @@
+<title>Fixed-Function OpenGL → wgpu/WGSL</title>
+<style>
+  :root {
+    --ink-900: #12151a;
+    --ink-800: #1a1e25;
+    --paper-50: #f5f2ec;
+    --paper-100: #ece7dd;
+    --text-dark: #dfdcd3;
+    --text-light: #201d17;
+    --muted-dark: #8b93a1;
+    --muted-light: #6b6255;
+    --amber: #b9793a;
+    --amber-soft: rgba(185, 121, 58, 0.13);
+    --teal: #3f9c93;
+    --teal-soft: rgba(63, 156, 147, 0.13);
+    --rule: rgba(139, 147, 161, 0.28);
+    --code-bg: rgba(0, 0, 0, 0.22);
+    --code-bg-light: rgba(0, 0, 0, 0.045);
+
+    --bg: var(--paper-50);
+    --panel: var(--paper-100);
+    --text: var(--text-light);
+    --muted: var(--muted-light);
+    --code-surface: var(--code-bg-light);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: var(--ink-900);
+      --panel: var(--ink-800);
+      --text: var(--text-dark);
+      --muted: var(--muted-dark);
+      --code-surface: var(--code-bg);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: var(--ink-900);
+    --panel: var(--ink-800);
+    --text: var(--text-dark);
+    --muted: var(--muted-dark);
+    --code-surface: var(--code-bg);
+  }
+  :root[data-theme="light"] {
+    --bg: var(--paper-50);
+    --panel: var(--paper-100);
+    --text: var(--text-light);
+    --muted: var(--muted-light);
+    --code-surface: var(--code-bg-light);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Charter, "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, "Liberation Mono", monospace;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 4.5rem 1.75rem 6rem;
+  }
+
+  /* -- background: faint coordinate grid, echoing the Dreieck-ABC axes on slide 29 -- */
+  .page {
+    background-image:
+      linear-gradient(var(--rule) 1px, transparent 1px),
+      linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+    background-size: 42px 42px;
+    background-position: -1px -1px;
+    background-attachment: local;
+    opacity: 1;
+  }
+  .page::before { content: none; }
+
+  header.masthead {
+    margin-bottom: 3.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .eyebrow {
+    font-size: 0.78rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 0.9rem;
+  }
+  .eyebrow .amber { color: var(--amber); }
+  .eyebrow .teal { color: var(--teal); }
+
+  h1 {
+    font-family: inherit;
+    font-size: clamp(1.9rem, 4vw, 2.6rem);
+    line-height: 1.15;
+    margin: 0 0 0.6rem;
+    text-wrap: balance;
+    font-weight: 700;
+  }
+  h1 .arrow {
+    display: inline-block;
+    padding: 0 0.15em;
+    background: linear-gradient(90deg, var(--amber), var(--teal));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .dek {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--muted);
+    font-size: 1.05rem;
+  }
+
+  .legend {
+    display: flex;
+    gap: 1.75rem;
+    margin-top: 1.75rem;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.85rem;
+  }
+  .legend-item .chip {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 2px;
+    flex: none;
+  }
+  .chip.amber { background: var(--amber); }
+  .chip.teal { background: var(--teal); }
+
+  section.stage {
+    margin: 3.6rem 0;
+  }
+  section.stage:first-of-type { margin-top: 0; }
+
+  .stage-label {
+    font-size: 0.78rem;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  .stage-label .n { color: var(--text); font-weight: 600; }
+
+  h2 {
+    font-family: inherit;
+    font-size: 1.5rem;
+    margin: 0 0 0.75rem;
+    text-wrap: balance;
+    font-weight: 700;
+  }
+
+  .stage-prose {
+    max-width: 66ch;
+    margin: 0 0 1.4rem;
+    color: var(--text);
+  }
+  .stage-prose + .stage-prose { margin-top: -0.8rem; }
+
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.1rem;
+    align-items: stretch;
+  }
+  @media (max-width: 680px) {
+    .compare { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border-radius: 5px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .panel.legacy { border-left: 3px solid var(--amber); }
+  .panel.modern { border-left: 3px solid var(--teal); }
+
+  .panel-tag {
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    padding: 0.6rem 0.9rem 0.5rem;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .panel-tag b { color: var(--text); font-weight: 600; }
+
+  pre {
+    margin: 0;
+    padding: 0 0.9rem 0.9rem;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: transparent;
+  }
+  code { font-family: inherit; }
+  .cm { color: var(--muted); font-style: italic; }
+  .kw.amber { color: var(--amber); }
+  .kw.teal { color: var(--teal); }
+
+  .callout {
+    margin-top: 1.1rem;
+    padding: 0.95rem 1.15rem;
+    background: var(--panel);
+    border-radius: 5px;
+    font-size: 0.92rem;
+  }
+  .callout .label {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+  .callout p { margin: 0; }
+  .callout p + p { margin-top: 0.5rem; }
+
+  .source {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 0.6rem;
+  }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  footer ul { margin: 0.6rem 0 0; padding-left: 1.2rem; }
+  footer li { margin-bottom: 0.3rem; }
+</style>
+
+<div class="page">
+
+<header class="masthead">
+  <p class="eyebrow mono"><span class="amber">// glBegin/glEnd</span> &nbsp;→&nbsp; <span class="teal">@vertex / @fragment</span></p>
+  <h1>Fixed-Function OpenGL <span class="arrow">→</span> wgpu/WGSL</h1>
+  <p class="dek">Wie die Dino-Buch-Beispiele (Kap. 1–2, LWJGL/GL11) dieselben Probleme lösen wie <strong>astronomore</strong> — nur mit dreißig Jahren Architektur dazwischen. Eine Stufe-für-Stufe-Gegenüberstellung entlang der Rendering-Pipeline.</p>
+  <div class="legend">
+    <div class="legend-item"><span class="chip amber"></span> Java / LWJGL — GL11 fixed-function &amp; #version 130 GLSL</div>
+    <div class="legend-item"><span class="chip teal"></span> Rust — wgpu 29 / WGSL (astronomore)</div>
+  </div>
+</header>
+
+<section class="stage">
+  <p class="stage-label mono"><span class="n">01</span> · fenster &amp; render-loop</p>
+  <h2>Wer ruft eigentlich einen Frame auf?</h2>
+  <p class="stage-prose">Im Dino-Buch ist die Render-Loop eine explizite <code class="mono">while</code>-Schleife, die das Programm selbst besitzt und die bei jedem Durchlauf einen Frame anfordert. In winit/wgpu dreht sich das um: das Betriebssystem ruft <code class="mono">window_event</code> auf, wenn ein Frame fällig ist — die App bittet lediglich am Ende jedes Frames um den nächsten.</p>
+  <div class="compare">
+    <div class="panel legacy">
+      <div class="panel-tag mono"><span>FlaecheSchwingt.java</span><b>renderLoop()</b></div>
+      <pre class="mono"><code><span class="cm">// LWJGLBasisFenster.start():</span>
+initDisplay();
+<span class="kw amber">renderLoop</span>();   <span class="cm">// blockiert bis Close</span>
+Display.destroy();
+
+<span class="cm">// die Loop selbst, imperativ:</span>
+<span class="kw amber">while</span> (!Display.isCloseRequested()) {
+    <span class="kw amber">double</span> t = (System.nanoTime()-start)/1e9;
+    <span class="cm">// ... Zustand setzen, zeichnen ...</span>
+    Display.update();  <span class="cm">// swap + poll</span>
+}</code></pre>
+    </div>
+    <div class="panel modern">
+      <div class="panel-tag mono"><span>lib.rs:224, 295, 1446</span><b>ApplicationHandler</b></div>
+      <pre class="mono"><code><span class="cm">// window_event(RedrawRequested):</span>
+self.update();
+self.render();
+
+<span class="kw teal">pub fn</span> render(&amp;<span class="kw teal">mut</span> self) -&gt; Result&lt;()&gt; {
+    self.gpu.window.request_redraw();
+    <span class="cm">// eigener Redraw wird selbst angefordert —</span>
+    <span class="cm">// keine while-Schleife, der Compositor treibt</span>
+    <span class="cm">// den nächsten Aufruf</span>
+    ...
+}</code></pre>
+    </div>
+  </div>
+  <div class="callout">
+    <span class="label mono">Kernunterschied</span>
+    <p>LWJGL pollt aktiv in einer eigenen Schleife. winit ist Event-getrieben: <code class="mono">request_redraw()</code> stellt nur eine Anfrage an den Compositor, der irgendwann darauf mit <code class="mono">RedrawRequested</code> antwortet. Das macht Dinge wie Minimieren, Multi-Window oder WASM-Integration von Anfang an sauber möglich.</p>
+  </div>
+</section>
+
+<section class="stage">
+  <p class="stage-label mono"><span class="n">02</span> · bildschirm löschen</p>
+  <h2>Clear-Color: Befehl vs. Deklaration</h2>
+  <p class="stage-prose">POGL bündelt zwei State-Machine-Aufrufe zu einer Hilfsfunktion. In wgpu ist "löschen" kein Befehl mehr, den man mittendrin ausführt, sondern eine Eigenschaft, die man beim Eröffnen des Render-Passes deklariert.</p>
+  <div class="compare">
+    <div class="panel legacy">
+      <div class="panel-tag mono"><span>POGL.java</span><b>clearBackgroundWithColor</b></div>
+      <pre class="mono"><code><span class="kw amber">public static void</span> clearBackgroundWithColor(
+    <span class="kw amber">float</span> r, <span class="kw amber">float</span> g, <span class="kw amber">float</span> b, <span class="kw amber">float</span> a) {
+  glClearColor(r, g, b, a);
+  glClear(GL_COLOR_BUFFER_BIT);
+}</code></pre>
+    </div>
+    <div class="panel modern">
+      <div class="panel-tag mono"><span>lib.rs:341–353</span><b>RenderPassColorAttachment</b></div>
+      <pre class="mono"><code>RenderPassColorAttachment {
+  view: &amp;frame_view,
+  ops: Operations {
+    load: LoadOp::Clear(Color {
+      r: self.view.background_color[0],
+      g: ..., b: ..., a: 1.0,
+    }),
+    <span class="cm">// store: Store — Ergebnis behalten</span>
+  },
+}</code></pre>
+    </div>
+  </div>
+  <div class="callout">
+    <span class="label mono">Kernunterschied</span>
+    <p><code class="mono">glClear</code> ist ein Seiteneffekt, der irgendwo im Frame passiert. <code class="mono">LoadOp::Clear</code> ist Teil der Beschreibung des Render-Passes selbst — die GPU weiß dadurch <em>vorab</em>, dass der alte Framebuffer-Inhalt irrelevant ist, was auf Tile-basierten GPUs (Mobile, WebGL) echte Bandbreite spart.</p>
+  </div>
+</section>
+
+<section class="stage">
+  <p class="stage-label mono"><span class="n">03</span> · geometrie zeichnen</p>
+  <h2>Immediate Mode vs. Vertex/Index-Buffer</h2>
+  <p class="stage-prose">Das ist der größte architektonische Sprung im ganzen Vergleich. <code class="mono">glBegin</code>/<code class="mono">glVertex</code>/<code class="mono">glEnd</code> schickt bei <em>jedem einzelnen Frame</em> jeden Vertex einzeln über den Treiber zur GPU. wgpu lädt die Geometrie <em>einmalig</em> auf die GPU und referenziert sie danach nur noch.</p>
+  <div class="compare">
+    <div class="panel legacy">
+      <div class="panel-tag mono"><span>POGL.java</span><b>Würfel, immediate mode</b></div>
+      <pre class="mono"><code>glBegin(GL_QUADS);
+  glVertex3f(-1, -1, -1); <span class="cm">// Punkt A</span>
+  glVertex3f( 1, -1, -1); <span class="cm">// Punkt B</span>
+  glVertex3f( 1,  1, -1); <span class="cm">// Punkt C</span>
+  glVertex3f(-1,  1, -1); <span class="cm">// Punkt D</span>
+  <span class="cm">// ... 5 weitere Seiten, jeden Frame neu</span>
+glEnd();</code></pre>
+    </div>
+    <div class="panel modern">
+      <div class="panel-tag mono"><span>mesh.rs · celestial_body.rs:210</span><b>einmalig hochladen, pro Frame binden</b></div>
+      <pre class="mono"><code><span class="cm">// einmalig, beim Erzeugen des Körpers:</span>
+<span class="kw teal">let</span> mesh = Mesh::sphere(device, 128, 64);
+<span class="cm">// -&gt; vertex_buffer, index_buffer auf der GPU</span>
+
+<span class="cm">// pro Frame, nur noch eine Referenz:</span>
+pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+pass.set_index_buffer(mesh.index_buffer.slice(..), ...);
+pass.draw_indexed(0..mesh.num_elements, 0, 0..1);</code></pre>
+    </div>
+  </div>
+  <div class="callout">
+    <span class="label mono">Kernunterschied</span>
+    <p>Immediate Mode kennt keinen Unterschied zwischen "Geometrie beschreiben" und "Geometrie zeichnen" — beides passiert gleichzeitig, jeden Frame. wgpu trennt das strikt: Vertex-/Index-Buffer sind persistenter GPU-Speicher, das Zeichnen ist nur noch ein Draw-Call, der auf bereits vorhandene Daten zeigt. Deshalb tessellieren wir die Kugel auch nur bei Parameteränderung neu (<code class="mono">rebuild_mesh</code>), nicht pro Frame.</p>
+  </div>
+</section>
+
+<section class="stage">
+  <p class="stage-label mono"><span class="n">04</span> · transformationskette</p>
+  <h2>M = I · P · T · R · S — Stack vs. Ausdruck</h2>
+  <p class="stage-prose">Folie 41/42 zeigt die Kette <code class="mono">M=I; M*P; M*T; M*R; M*S</code> als Folge mutierender Aufrufe auf einem globalen Matrix-Stack, rückwärts gelesen. astronomore rechnet dieselbe Mathematik — aber als benannten, expliziten Ausdruck auf der CPU, der dann als fertige Matrix zur GPU hochgeladen wird.</p>
+  <div class="compare">
+    <div class="panel legacy">
+      <div class="panel-tag mono"><span>FlaecheSchwingt.java:46–58</span><b>impliziter Matrix-Stack</b></div>
+      <pre class="mono"><code>glLoadIdentity();                    <span class="cm">// M=I</span>
+glFrustum(-1,1, -1,1, 3,10);         <span class="cm">// M*P</span>
+glTranslated(0, 0, -4);              <span class="cm">// M*T</span>
+glRotatef(sin(t)*120f, 0,1,0);       <span class="cm">// M*R</span>
+glScaled(0.8, 0.8, 0.8);             <span class="cm">// M*S</span>
+POGL.renderViereck();                <span class="cm">// v' = M*v, pro Vertex</span></code></pre>
+    </div>
+    <div class="panel modern">
+      <div class="panel-tag mono"><span>celestial_body.rs:24–30 · camera.rs:135,164</span><b>explizite glam-Matrix</b></div>
+      <pre class="mono"><code><span class="cm">// Projektion &amp; View (camera.rs):</span>
+Mat4::perspective_rh(fov_y, aspect, near, far);
+Mat4::look_at_rh(camera_pos, target, Vec3::Y);
+
+<span class="cm">// Modell-Transform (celestial_body.rs):</span>
+<span class="kw teal">let</span> scale = Mat4::from_scale(Vec3::splat(radius));
+<span class="kw teal">let</span> model = world_transform * spin_transform * scale;
+<span class="cm">// -&gt; einmal pro Frame in Uniform-Buffer geschrieben</span></code></pre>
+    </div>
+  </div>
+  <div class="callout">
+    <span class="label mono">Kernunterschied</span>
+    <p>Die Reihenfolge-Logik ("rechts wirkt zuerst") ist identisch — das ist dieselbe Mathematik. Der Unterschied ist, <em>wo</em> sie lebt: GL11 mutiert einen unsichtbaren globalen Zustand mit Seiteneffekt-Aufrufen; glam multipliziert benannte <code class="mono">Mat4</code>-Werte zu einem Ausdruck, der nichts Globales anfasst und sich debuggen/testen lässt, bevor er die GPU überhaupt erreicht.</p>
+  </div>
+</section>
+
+<section class="stage">
+  <p class="stage-label mono"><span class="n">05</span> · daten in den shader bringen</p>
+  <h2>Built-ins vs. explizite Bind Groups</h2>
+  <p class="stage-prose">Die Torus-Shader nutzen GLSL-Built-ins, die im Fixed-Function-Kontext "einfach da sind" — <code class="mono">gl_ModelViewProjectionMatrix</code>, <code class="mono">gl_Normal</code>. WGSL kennt so etwas nicht: jede Matrix, jeder Wert muss über eine <code class="mono">struct</code> deklariert und einer Bind Group zugeordnet werden.</p>
+  <div class="compare">
+    <div class="panel legacy">
+      <div class="panel-tag mono"><span>torusambientdiffusespecularfinal.vs</span><b>implizite Built-ins</b></div>
+      <pre class="mono"><code>#version 130
+<span class="kw amber">uniform float</span> ambient, diffuseWeight, specularWeight;
+<span class="kw amber">uniform vec3</span> lightDirection;
+
+<span class="kw amber">void</span> main() {
+  vec3 n = gl_NormalMatrix * gl_Normal;      <span class="cm">// woher?</span>
+  gl_Position = gl_ModelViewProjectionMatrix
+                * gl_Vertex;                 <span class="cm">// woher?</span>
+}</code></pre>
+    </div>
+    <div class="panel modern">
+      <div class="panel-tag mono"><span>shader.wgsl:1–42</span><b>explizite Bind Groups</b></div>
+      <pre class="mono"><code><span class="cm">// group 1: Kamera</span>
+<span class="kw teal">struct</span> CameraUniform { view_proj: mat4x4&lt;f32&gt;, camera_pos: vec3&lt;f32&gt; }
+@group(1) @binding(0) <span class="kw teal">var</span>&lt;uniform&gt; camera: CameraUniform;
+
+<span class="cm">// group 2: Modell-Transform</span>
+<span class="kw teal">struct</span> ModelUniform { model_to_world_transform: mat4x4&lt;f32&gt; }
+@group(2) @binding(0) <span class="kw teal">var</span>&lt;uniform&gt; model_transform: ModelUniform;</code></pre>
+    </div>
+  </div>
+  <div class="callout">
+    <span class="label mono">Kernunterschied</span>
+    <p>Nichts kommt "von irgendwoher": jede Bind Group in astronomore hat eine feste, dokumentierte Nummer (0 Textur, 1 Kamera, 2 Modell, 3 Szene-Eigenschaften — siehe Kommentar oben in <code class="mono">shader.wgsl</code>). Der Preis dafür ist mehr Boilerplate; der Gewinn ist, dass der Shader unabhängig vom Rest der Pipeline lesbar und typgeprüft ist (<code class="mono">naga</code>-Validierung statt Laufzeit-Crash).</p>
+  </div>
+</section>
+
+<section class="stage">
+  <p class="stage-label mono"><span class="n">06</span> · beleuchtung</p>
+  <h2>Per-Vertex-Phong vs. Per-Fragment-Blinn-Phong</h2>
+  <p class="stage-prose">Beide Beispiele rechnen ambient + diffus + spekular. Der Torus-Shader tut das pro <em>Vertex</em> und interpoliert die fertige Farbe über das Dreieck (Gouraud-Shading) — sichtbar an den Facetten bei grober Tessellierung. astronomore rechnet pro <em>Fragment</em> und nutzt den Blinn-Phong-Halfway-Vektor statt <code class="mono">reflect()</code>.</p>
+  <div class="compare">
+    <div class="panel legacy">
+      <div class="panel-tag mono"><span>torusambientdiffusespecularfinal.vs</span><b>Phong, pro Vertex</b></div>
+      <pre class="mono"><code>vec3 l = normalize(lightDirection - (gl_ModelViewProjectionMatrix
+                                       * gl_Vertex).xyz);
+vec3 n = gl_NormalMatrix * gl_Normal;
+vec3 v = -normalize((gl_ModelViewMatrix * gl_Vertex).xyz);
+vec3 r = reflect(l, n);
+<span class="kw amber">float</span> specular = max(0., pow(dot(r,v), specularPow));
+<span class="kw amber">float</span> diffuse  = dot(n, l);
+color = vec4(1) * (ambient + diffuse*diffuseWeight
+                          + specular*specularWeight);
+<span class="cm">// -&gt; als "flat" color interpoliert, .fs gibt sie nur aus</span></code></pre>
+    </div>
+    <div class="panel modern">
+      <div class="panel-tag mono"><span>shader.wgsl:94–110</span><b>Blinn-Phong, pro Fragment</b></div>
+      <pre class="mono"><code><span class="kw teal">let</span> N = normalize(in.body_normal.xyz);
+<span class="kw teal">let</span> L = normalize(light_pos - in.body_position.xyz);
+<span class="kw teal">let</span> V = normalize(camera.camera_pos - in.body_position.xyz);
+<span class="kw teal">let</span> H = normalize(L + V);           <span class="cm">// Halfway-Vektor</span>
+
+<span class="kw teal">let</span> diffuse  = light_color * scene_props.diffuse_factor
+                * max(dot(L, N), 0.0);
+<span class="kw teal">let</span> specular = light_color * scene_props.specular_intensity
+                * pow(max(dot(H, N), 0.0), scene_props.shininess);</code></pre>
+    </div>
+  </div>
+  <div class="callout">
+    <span class="label mono">Kernunterschied</span>
+    <p>Gouraud (Vertex) vs. Phong-Shading (Fragment) ist ein klassischer Buch-Gegensatz (Kap. 6). Bei 128×64 Segmenten pro Kugel wäre Vertex-Shading hier vermutlich kaum vom Fragment-Ergebnis zu unterscheiden — aber die Blinn-Halfway-Formel <code class="mono">pow(dot(H,N), shininess)</code> ist zusätzlich numerisch stabiler als <code class="mono">reflect()</code> bei streifenden Winkeln, was bei der Sonne als Punktlicht direkt sichtbar wird.</p>
+  </div>
+</section>
+
+<section class="stage">
+  <p class="stage-label mono"><span class="n">07</span> · material: farbe oder textur</p>
+  <h2>glColor3d als globaler State vs. Uniform-Flag</h2>
+  <p class="stage-prose">Immediate Mode setzt die aktuelle Zeichenfarbe als globalen State, der für alle folgenden <code class="mono">glVertex</code>-Aufrufe gilt, bis er erneut geändert wird. astronomore trifft dieselbe Entscheidung (Textur oder Flachfarbe) pro Fragment über ein Uniform-Flag.</p>
+  <div class="compare">
+    <div class="panel legacy">
+      <div class="panel-tag mono"><span>HintergrundUmschalten.java</span><b>globaler Farb-State</b></div>
+      <pre class="mono"><code>glColor3d(0.05, 0.39, 0.51);   <span class="cm">// gilt ab jetzt für alle</span>
+glLineWidth(3.0f);             <span class="cm">// folgenden glVertex-Aufrufe,</span>
+POGL.renderViereck();          <span class="cm">// bis erneut glColor3d() kommt</span></code></pre>
+    </div>
+    <div class="panel modern">
+      <div class="panel-tag mono"><span>shader.wgsl:88–89</span><b>Uniform-Flag pro Fragment</b></div>
+      <pre class="mono"><code><span class="kw teal">let</span> tex_color = textureSample(t_diffuse, s_diffuse, in.tex_coords).rgb;
+<span class="kw teal">let</span> base_color = select(
+  scene_props.object_color.xyz,   <span class="cm">// wenn use_texture == 0</span>
+  tex_color,                      <span class="cm">// wenn use_texture != 0</span>
+  scene_props.use_texture != 0u,
+);</code></pre>
+    </div>
+  </div>
+  <div class="callout">
+    <span class="label mono">Kernunterschied</span>
+    <p><code class="mono">textureSample</code> wird hier bewusst <em>unbedingt</em> aufgerufen, auch wenn das Ergebnis danach verworfen wird (Kommentar im Original-Shader) — ein WebGL/WGSL-spezifisches Detail: der Textur-Sample-Aufruf muss in "uniform control flow" liegen, darf also nicht in einem <code class="mono">if</code>-Block stehen, selbst wenn die Bedingung zur Laufzeit für alle Fragmente gleich ausfällt. Ein Fixed-Function-Äquivalent dazu gibt es schlicht nicht, weil <code class="mono">glColor3d</code> nie mit Texture-Sampling konkurriert.</p>
+  </div>
+</section>
+
+<section class="stage">
+  <p class="stage-label mono"><span class="n">08</span> · shader laden</p>
+  <h2>.vs/.fs-Dateipaare vs. eine validierte .wgsl-Datei</h2>
+  <p class="stage-prose">Kapitel 2 trennt Vertex- und Fragment-Shader in eigene Dateien (<code class="mono">torus*.vs</code> / <code class="mono">torus*.fs</code>), geladen und kompiliert über <code class="mono">ShaderUtilities.java</code>. astronomore hält beide Stufen in einer <code class="mono">.wgsl</code>-Datei und validiert sie vor dem Erzeugen des Shader-Moduls.</p>
+  <div class="compare">
+    <div class="panel legacy">
+      <div class="panel-tag mono"><span>shader/*.vs · shader/*.fs</span><b>getrennte Dateien</b></div>
+      <pre class="mono"><code>torusambientdiffusespecularfinal.vs
+torusambientdiffusespecularfinal.fs
+<span class="cm">// Laden/Kompilieren via ShaderUtilities.java,</span>
+<span class="cm">// Fehler laufen i.d.R. über GL-Info-Logs zur Laufzeit</span></code></pre>
+    </div>
+    <div class="panel modern">
+      <div class="panel-tag mono"><span>shader_loader.rs</span><b>eine Datei, geprüft vor Erzeugung</b></div>
+      <pre class="mono"><code><span class="cm">// vor jedem create_shader_module():</span>
+shader_loader::validate_wgsl(source)?;
+<span class="cm">// naga parst &amp; validiert, miette zeigt den</span>
+<span class="cm">// Fehler exakt an der Quell-Zeile/-Spalte —</span>
+<span class="cm">// plus Hot-Reload nativ via notify-debouncer-mini</span></code></pre>
+    </div>
+  </div>
+  <div class="callout">
+    <span class="label mono">Kernunterschied</span>
+    <p>Ein Shader-Fehler in GL11 zeigt sich oft erst als schwarzes Dreieck oder ein Log-String zur Laufzeit. <code class="mono">naga</code> parst WGSL vorab und liefert einen source-span-genauen Fehler <em>bevor</em> die GPU ihn je sieht — der Unterschied zwischen "Debuggen am Treiber-Log" und "Compiler-Fehler mit Zeilennummer".</p>
+  </div>
+</section>
+
+<footer>
+  <p><strong>Quellen dieser Gegenüberstellung:</strong></p>
+  <ul>
+    <li>Folien: <span class="mono">Grundlegendes_zu_OpenGL.pdf</span>, S. 29–45 (Dreieck, LWJGLBasisFenster, Transformationsketten, POGL)</li>
+    <li>Java: <span class="mono">kapitel01/FlaecheSchwingt.java</span>, <span class="mono">kapitel01/HintergrundUmschalten.java</span>, <span class="mono">kapitel01/POGL.java</span></li>
+    <li>GLSL: <span class="mono">shader/torusambientdiffusespecularfinal.{vs,fs}</span></li>
+    <li>Rust/WGSL: <span class="mono">src/lib.rs</span>, <span class="mono">src/camera.rs</span>, <span class="mono">src/celestial_body.rs</span>, <span class="mono">src/mesh.rs</span>, <span class="mono">src/shaders/shader.wgsl</span></li>
+  </ul>
+</footer>
+
+</div>
