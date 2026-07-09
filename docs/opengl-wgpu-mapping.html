@@ -270,40 +270,56 @@
 <section class="stage">
   <p class="stage-label mono"><span class="n">01</span> · fenster &amp; render-loop</p>
   <h2>Wer ruft eigentlich einen Frame auf?</h2>
-  <p class="stage-prose">Im Dino-Buch ist die Render-Loop eine explizite <code class="mono">while</code>-Schleife, die das Programm selbst besitzt und die bei jedem Durchlauf einen Frame anfordert. In winit/wgpu dreht sich das um: das Betriebssystem ruft <code class="mono">window_event</code> auf, wenn ein Frame fällig ist — die App bittet lediglich am Ende jedes Frames um den nächsten.</p>
+  <p class="stage-prose">Beide haben eine blockierende Schleife irgendwo — die Frage ist nur, <em>wer sie besitzt</em>. Im Dino-Buch schreibt die App die <code class="mono">while</code>-Schleife selbst und ruft explizit alles auf: Zeitmessung, Zeichnen, Buffer-Swap. Bei winit gehört die Schleife der Bibliothek (<code class="mono">event_loop.run_app()</code>); unser Code sitzt nur noch als Callback <code class="mono">window_event()</code> darin und bekommt einen Frame zugeteilt, wenn winit einen für fällig hält.</p>
+  <p class="stage-prose">Damit dieser Callback <em>überhaupt wiederholt</em> aufgerufen wird, muss jeder Frame selbst wieder einen weiteren anfordern — sonst würde die Schleife nach dem ersten Frame verstummen. Das ist die Aufgabe von <code class="mono">request_redraw()</code> am Anfang von <code class="mono">render()</code>: es plant keinen neuen Frame sofort, sondern reiht für die <em>nächste</em> Runde der winit-eigenen Schleife ein <code class="mono">RedrawRequested</code>-Event ein.</p>
   <div class="compare">
     <div class="panel legacy">
-      <div class="panel-tag mono"><span>FlaecheSchwingt.java</span><b>renderLoop()</b></div>
+      <div class="panel-tag mono"><span>FlaecheSchwingt.java</span><b>renderLoop() — Schleife im eigenen Code</b></div>
       <pre class="mono"><code><span class="cm">// LWJGLBasisFenster.start():</span>
 initDisplay();
-<span class="kw amber">renderLoop</span>();   <span class="cm">// blockiert bis Close</span>
+<span class="kw amber">renderLoop</span>();   <span class="cm">// blockiert hier bis Close</span>
 Display.destroy();
 
-<span class="cm">// die Loop selbst, imperativ:</span>
+<span class="cm">// renderLoop() IST die Schleife — sie lebt</span>
+<span class="cm">// komplett in unserem Code:</span>
 <span class="kw amber">while</span> (!Display.isCloseRequested()) {
     <span class="kw amber">double</span> t = (System.nanoTime()-start)/1e9;
     <span class="cm">// ... Zustand setzen, zeichnen ...</span>
-    Display.update();  <span class="cm">// swap + poll</span>
+    Display.update();  <span class="cm">// swap + Events pollen,</span>
+                        <span class="cm">// dann direkt weiter zur</span>
+                        <span class="cm">// naechsten Iteration</span>
 }</code></pre>
     </div>
     <div class="panel modern">
-      <div class="panel-tag mono"><span>lib.rs:224, 295, 1446</span><b>ApplicationHandler</b></div>
-      <pre class="mono"><code><span class="cm">// window_event(RedrawRequested):</span>
-self.update();
-self.render();
+      <div class="panel-tag mono"><span>lib.rs:1519, 1446, 296</span><b>run_app() — Schleife in winit, wir nur Callback</b></div>
+      <pre class="mono"><code><span class="cm">// run() — DIES ist die eigentliche Schleife,</span>
+<span class="cm">// nur gehoert sie winit statt uns:</span>
+event_loop.run_app(&amp;<span class="kw teal">mut</span> app)?;   <span class="cm">// blockiert hier</span>
 
-<span class="kw teal">pub fn</span> render(&amp;<span class="kw teal">mut</span> self) -&gt; Result&lt;()&gt; {
-    self.gpu.window.request_redraw();
-    <span class="cm">// eigener Redraw wird selbst angefordert —</span>
-    <span class="cm">// keine while-Schleife, der Compositor treibt</span>
-    <span class="cm">// den nächsten Aufruf</span>
-    ...
-}</code></pre>
+<span class="cm">// winit ruft bei jedem Durchlauf, wenn ein</span>
+<span class="cm">// Redraw faellig ist, unseren Callback auf:</span>
+<span class="kw teal">fn</span> window_event(...) {
+    <span class="kw teal">match</span> event {
+        WindowEvent::RedrawRequested =&gt; {
+            state.update();
+            state.render();   <span class="cm">// zeichnet DIESEN Frame</span>
+        }
+        ...
+    }
+}
+
+<span class="cm">// am Anfang jedes render()-Aufrufs:</span>
+self.gpu.window.request_redraw();
+<span class="cm">// kein neuer Frame JETZT — nur eine Anmeldung</span>
+<span class="cm">// fuer den NAECHSTEN Durchlauf der obigen</span>
+<span class="cm">// run_app()-Schleife. Ohne diesen Aufruf würde</span>
+<span class="cm">// nach diesem Frame kein RedrawRequested mehr</span>
+<span class="cm">// kommen und die App stünde still.</span></code></pre>
     </div>
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>LWJGL pollt aktiv in einer eigenen Schleife. winit ist Event-getrieben: <code class="mono">request_redraw()</code> stellt nur eine Anfrage an den Compositor, der irgendwann darauf mit <code class="mono">RedrawRequested</code> antwortet. Das macht Dinge wie Minimieren, Multi-Window oder WASM-Integration von Anfang an sauber möglich.</p>
+    <p>Die Schleife verschwindet nicht — sie wandert nur aus unserem Code heraus in die Bibliothek. LWJGL: wir schreiben <code class="mono">while(...)</code> und rufen <code class="mono">Display.update()</code> selbst am Ende jeder Iteration auf. winit: <code class="mono">event_loop.run_app()</code> ist die Schleife, und wir lösen die nächste Runde nicht durch eigenen Code-Fluss aus, sondern indem wir <em>innerhalb</em> des aktuellen Callback-Aufrufs <code class="mono">request_redraw()</code> rufen — eine Art "meld mich für die nächste Runde an", bevor winit weiterschaltet. Der Vorteil: dieselbe Schleife kann daneben auch Tastatur-/Maus-Events, Resize und (auf WASM) den Browser-eigenen <code class="mono">requestAnimationFrame</code>-Takt bedienen, ohne dass unser Code das koordinieren müsste.</p>
   </div>
 </section>
 
