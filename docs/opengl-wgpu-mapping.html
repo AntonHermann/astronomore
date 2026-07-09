@@ -337,22 +337,29 @@ self.gpu.window.request_redraw();
 }</code></pre>
     </div>
     <div class="panel modern">
-      <div class="panel-tag mono"><span>lib.rs:341–353</span><b>RenderPassColorAttachment</b></div>
+      <div class="panel-tag mono"><span>lib.rs:341–367</span><b>RenderPassDescriptor</b></div>
       <pre class="mono"><code>RenderPassColorAttachment {
   view: &amp;frame_view,
   ops: Operations {
-    load: LoadOp::Clear(Color {
-      r: self.view.background_color[0],
-      g: ..., b: ..., a: 1.0,
-    }),
-    <span class="cm">// store: Store — Ergebnis behalten</span>
+    load: LoadOp::Clear(Color { r: ..., g: ..., b: ..., a: 1.0 }),
+    store: StoreOp::Store,
   },
-}</code></pre>
+  ...
+}
+<span class="cm">// im selben Descriptor, nicht extra: der Tiefenpuffer</span>
+depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+  view: &amp;self.gpu.depth_texture.view,
+  depth_ops: Some(Operations {
+    load: LoadOp::Clear(1.0),
+    store: StoreOp::Store,
+  }),
+  ...
+})</code></pre>
     </div>
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p><code class="mono">glClear</code> ist ein Seiteneffekt, der irgendwo im Frame passiert. <code class="mono">LoadOp::Clear</code> ist Teil der Beschreibung des Render-Passes selbst — die GPU weiß dadurch <em>vorab</em>, dass der alte Framebuffer-Inhalt irrelevant ist, was auf Tile-basierten GPUs (Mobile, WebGL) echte Bandbreite spart.</p>
+    <p><code class="mono">glClear(GL_COLOR_BUFFER_BIT)</code> ist ein Seiteneffekt, der irgendwo im Frame passiert und im POGL-Beispiel nur die Farbe trifft — kein Tiefenpuffer im Spiel. <code class="mono">LoadOp::Clear</code> ist Teil der Beschreibung des Render-Passes selbst, und Farb- <em>und</em> Tiefenpuffer werden im selben Descriptor deklarativ deklariert. Die GPU weiß dadurch <em>vorab</em>, dass der alte Framebuffer-Inhalt irrelevant ist — auf Tile-basierten GPUs (Mobile, WebGL) spart das echte Bandbreite.</p>
   </div>
 </section>
 
@@ -372,20 +379,23 @@ self.gpu.window.request_redraw();
 glEnd();</code></pre>
     </div>
     <div class="panel modern">
-      <div class="panel-tag mono"><span>mesh.rs · celestial_body.rs:210</span><b>einmalig hochladen, pro Frame binden</b></div>
-      <pre class="mono"><code><span class="cm">// einmalig, beim Erzeugen des Körpers:</span>
+      <div class="panel-tag mono"><span>mesh.rs:123 · celestial_body.rs:204–216</span><b>einmalig hochladen, pro Frame nur binden</b></div>
+      <pre class="mono"><code><span class="cm">// einmalig, beim Erzeugen des Körpers (mesh.rs:123):</span>
 <span class="kw teal">let</span> mesh = Mesh::sphere(device, 128, 64);
-<span class="cm">// -&gt; vertex_buffer, index_buffer auf der GPU</span>
+<span class="cm">// -&gt; vertex_buffer, index_buffer liegen ab jetzt auf der GPU</span>
 
-<span class="cm">// pro Frame, nur noch eine Referenz:</span>
-pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-pass.set_index_buffer(mesh.index_buffer.slice(..), ...);
-pass.draw_indexed(0..mesh.num_elements, 0, 0..1);</code></pre>
+<span class="cm">// pro Frame, nur noch Referenzen + 3 Bind Groups:</span>
+self.set_vertex_buffer(0, cb.mesh.vertex_buffer.slice(..));
+self.set_index_buffer(cb.mesh.index_buffer.slice(..), ...);
+self.set_bind_group(0, &amp;cb.texture.bind_group, &amp;[]);   <span class="cm">// Textur</span>
+self.set_bind_group(1, camera_bind_group, &amp;[]);         <span class="cm">// Kamera</span>
+self.set_bind_group(2, &amp;cb.model_bind_group, &amp;[]);      <span class="cm">// Modell</span>
+self.draw_indexed(0..cb.mesh.num_elements, 0, instances);</code></pre>
     </div>
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>Immediate Mode kennt keinen Unterschied zwischen "Geometrie beschreiben" und "Geometrie zeichnen" — beides passiert gleichzeitig, jeden Frame. wgpu trennt das strikt: Vertex-/Index-Buffer sind persistenter GPU-Speicher, das Zeichnen ist nur noch ein Draw-Call, der auf bereits vorhandene Daten zeigt. Deshalb tessellieren wir die Kugel auch nur bei Parameteränderung neu (<code class="mono">rebuild_mesh</code>), nicht pro Frame.</p>
+    <p>Immediate Mode kennt keinen Unterschied zwischen "Geometrie beschreiben" und "Geometrie zeichnen" — beides passiert gleichzeitig, jeden Frame, als ein Strom einzelner Vertex-Aufrufe. wgpu trennt das strikt: Vertex-/Index-Buffer sind persistenter GPU-Speicher (einmal in <code class="mono">Mesh::sphere</code> hochgeladen), das Zeichnen pro Frame ist nur noch das Binden dieser Referenzen plus dreier Bind Groups (Textur, Kamera, Modell — siehe Stufe 5) und ein Draw-Call. Deshalb tessellieren wir die Kugel auch nur bei Parameteränderung neu (<code class="mono">rebuild_mesh</code>), nicht pro Frame.</p>
   </div>
 </section>
 
@@ -404,20 +414,26 @@ glScaled(0.8, 0.8, 0.8);             <span class="cm">// M*S</span>
 POGL.renderViereck();                <span class="cm">// v' = M*v, pro Vertex</span></code></pre>
     </div>
     <div class="panel modern">
-      <div class="panel-tag mono"><span>celestial_body.rs:24–30 · camera.rs:135,164</span><b>explizite glam-Matrix</b></div>
-      <pre class="mono"><code><span class="cm">// Projektion &amp; View (camera.rs):</span>
-Mat4::perspective_rh(fov_y, aspect, near, far);
-Mat4::look_at_rh(camera_pos, target, Vec3::Y);
+      <div class="panel-tag mono"><span>camera.rs:163–164,382–384 · celestial_body.rs:24–26</span><b>explizite glam-Ausdrücke</b></div>
+      <pre class="mono"><code><span class="cm">// Projektion, camera.rs:164 (Kamera- -&gt; Clip-Space):</span>
+<span class="kw teal">let</span> proj = Mat4::perspective_rh(fov_y_rad, aspect_ratio, z_near, z_far);
 
-<span class="cm">// Modell-Transform (celestial_body.rs):</span>
+<span class="cm">// View, camera.rs:135 (Welt- -&gt; Kamera-Space, hier</span>
+<span class="cm">// die Orbit-Kamera; die FPS-Kamera nutzt look_to_rh):</span>
+<span class="kw teal">let</span> view = Mat4::look_at_rh(camera_pos, target_pos, Vec3::Y);
+
+<span class="cm">// beide werden explizit multipliziert, camera.rs:382–384:</span>
+self.view_proj = (proj * view).to_cols_array_2d();
+
+<span class="cm">// Modell-Transform, celestial_body.rs:24–26 (Objekt- -&gt;</span>
+<span class="cm">// Welt-Space, das Gegenstück zu M*T*R*S):</span>
 <span class="kw teal">let</span> scale = Mat4::from_scale(Vec3::splat(radius));
-<span class="kw teal">let</span> model = world_transform * spin_transform * scale;
-<span class="cm">// -&gt; einmal pro Frame in Uniform-Buffer geschrieben</span></code></pre>
+<span class="kw teal">let</span> model = world_transform * spin_transform * scale;</code></pre>
     </div>
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>Die Reihenfolge-Logik ("rechts wirkt zuerst") ist identisch — das ist dieselbe Mathematik. Der Unterschied ist, <em>wo</em> sie lebt: GL11 mutiert einen unsichtbaren globalen Zustand mit Seiteneffekt-Aufrufen; glam multipliziert benannte <code class="mono">Mat4</code>-Werte zu einem Ausdruck, der nichts Globales anfasst und sich debuggen/testen lässt, bevor er die GPU überhaupt erreicht.</p>
+    <p>Die Reihenfolge-Logik ("rechts wirkt zuerst") ist identisch — das ist dieselbe Mathematik, nur in zwei getrennte Ausdrücke aufgeteilt: <code class="mono">proj * view</code> für Kamera→Clip-Space (einmal pro Frame in <code class="mono">CameraUniform::update_view_proj</code>) und <code class="mono">world * spin * scale</code> für Objekt→Welt-Space (einmal pro Körper in <code class="mono">ModelUniform::new</code>). GL11 mutiert einen einzigen unsichtbaren globalen Stack mit Seiteneffekt-Aufrufen; glam multipliziert benannte <code class="mono">Mat4</code>-Werte zu Ausdrücken, die nichts Globales anfassen und sich debuggen/testen lassen, bevor sie die GPU überhaupt erreichen.</p>
   </div>
 </section>
 
@@ -498,10 +514,15 @@ color = vec4(1) * (ambient + diffuse*diffuseWeight
   <p class="stage-prose">Immediate Mode setzt die aktuelle Zeichenfarbe als globalen State, der für alle folgenden <code class="mono">glVertex</code>-Aufrufe gilt, bis er erneut geändert wird. astronomore trifft dieselbe Entscheidung (Textur oder Flachfarbe) pro Fragment über ein Uniform-Flag.</p>
   <div class="compare">
     <div class="panel legacy">
-      <div class="panel-tag mono"><span>HintergrundUmschalten.java</span><b>globaler Farb-State</b></div>
-      <pre class="mono"><code>glColor3d(0.05, 0.39, 0.51);   <span class="cm">// gilt ab jetzt für alle</span>
-glLineWidth(3.0f);             <span class="cm">// folgenden glVertex-Aufrufe,</span>
-POGL.renderViereck();          <span class="cm">// bis erneut glColor3d() kommt</span></code></pre>
+      <div class="panel-tag mono"><span>HintergrundUmschalten.java · renderLoop()</span><b>globaler Farb-State</b></div>
+      <pre class="mono"><code><span class="cm">// gilt ab hier fuer alle folgenden glVertex-Aufrufe,</span>
+<span class="cm">// bis irgendwo erneut glColor3d() aufgerufen wird:</span>
+glColor3d(0, .7 + 0.3*Math.sin(t), 0);
+glBegin(GL_TRIANGLES);
+  glVertex3d(-.5f, -.5f + 0.3*Math.sin(t), 0);
+  glVertex3d( .5f, 0 + 0.3*Math.sin(t*1.3), 0);
+  glVertex3d(0.3*Math.sin(t*2), .5f, 0);
+glEnd();</code></pre>
     </div>
     <div class="panel modern">
       <div class="panel-tag mono"><span>shader.wgsl:88–89</span><b>Uniform-Flag pro Fragment</b></div>
@@ -522,27 +543,37 @@ POGL.renderViereck();          <span class="cm">// bis erneut glColor3d() kommt<
 <section class="stage">
   <p class="stage-label mono"><span class="n">08</span> · shader laden</p>
   <h2>.vs/.fs-Dateipaare vs. eine validierte .wgsl-Datei</h2>
-  <p class="stage-prose">Kapitel 2 trennt Vertex- und Fragment-Shader in eigene Dateien (<code class="mono">torus*.vs</code> / <code class="mono">torus*.fs</code>), geladen und kompiliert über <code class="mono">ShaderUtilities.java</code>. astronomore hält beide Stufen in einer <code class="mono">.wgsl</code>-Datei und validiert sie vor dem Erzeugen des Shader-Moduls.</p>
+  <p class="stage-prose">Kapitel 2 trennt Vertex- und Fragment-Shader in eigene Dateien (<code class="mono">torus*.vs</code> / <code class="mono">torus*.fs</code>). <code class="mono">ShaderUtilities.java</code> liest davon nur den Text ein und prüft <em>nach</em> dem Linken den Erfolg über einen GL-Info-Log — das eigentliche <code class="mono">glCompileShader</code>/<code class="mono">glLinkProgram</code> passiert in den jeweiligen Beispiel-Klassen selbst (hier nicht gezeigt). astronomore validiert dagegen <em>vor</em> der GPU, mit exakter Fehlerposition im Quelltext.</p>
   <div class="compare">
     <div class="panel legacy">
-      <div class="panel-tag mono"><span>shader/*.vs · shader/*.fs</span><b>getrennte Dateien</b></div>
-      <pre class="mono"><code>torusambientdiffusespecularfinal.vs
-torusambientdiffusespecularfinal.fs
-<span class="cm">// Laden/Kompilieren via ShaderUtilities.java,</span>
-<span class="cm">// Fehler laufen i.d.R. über GL-Info-Logs zur Laufzeit</span></code></pre>
+      <div class="panel-tag mono"><span>ShaderUtilities.java:33,54–67</span><b>Text laden, Fehler erst nach dem Linken</b></div>
+      <pre class="mono"><code><span class="kw amber">public static</span> String readShadercode(String file) ... {
+  <span class="cm">// liest die .vs/.fs-Datei zeilenweise in einen String —</span>
+  <span class="cm">// keine Prüfung, nur Text-Einlesen</span>
+}
+
+<span class="kw amber">public static void</span> testShaderProgram(<span class="kw amber">int</span> shader) {
+  glGetProgram(shader, GL_LINK_STATUS, errorBuffer);
+  <span class="cm">// -&gt; erst NACH glCompileShader+glLinkProgram (anderswo)</span>
+  <span class="cm">// aufgerufen; bei Fehler: GL-Info-Log auf stderr</span>
+  glGetProgramInfoLog(shader, errorBuffer, infoBuffer);
+}</code></pre>
     </div>
     <div class="panel modern">
-      <div class="panel-tag mono"><span>shader_loader.rs</span><b>eine Datei, geprüft vor Erzeugung</b></div>
-      <pre class="mono"><code><span class="cm">// vor jedem create_shader_module():</span>
-shader_loader::validate_wgsl(source)?;
-<span class="cm">// naga parst &amp; validiert, miette zeigt den</span>
-<span class="cm">// Fehler exakt an der Quell-Zeile/-Spalte —</span>
-<span class="cm">// plus Hot-Reload nativ via notify-debouncer-mini</span></code></pre>
+      <div class="panel-tag mono"><span>shader_loader.rs:42–54</span><b>vor der GPU validiert</b></div>
+      <pre class="mono"><code><span class="cm">// vor jedem create_shader_module() aufgerufen:</span>
+<span class="kw teal">pub fn</span> validate_wgsl(filename: &amp;str, source: &amp;str) -&gt; Result&lt;()&gt; {
+  <span class="kw teal">let</span> module = naga::front::wgsl::parse_str(source)?;
+  Validator::new(ValidationFlags::all(), Capabilities::all())
+    .validate(&amp;module)?;
+  <span class="cm">// -&gt; bei Fehler: WgslError mit source-span fuer miette,</span>
+  <span class="cm">// nicht erst nach dem Hochladen zur GPU</span>
+}</code></pre>
     </div>
   </div>
   <div class="callout">
     <span class="label mono">Kernunterschied</span>
-    <p>Ein Shader-Fehler in GL11 zeigt sich oft erst als schwarzes Dreieck oder ein Log-String zur Laufzeit. <code class="mono">naga</code> parst WGSL vorab und liefert einen source-span-genauen Fehler <em>bevor</em> die GPU ihn je sieht — der Unterschied zwischen "Debuggen am Treiber-Log" und "Compiler-Fehler mit Zeilennummer".</p>
+    <p>In beiden Welten prüft eine Hilfsfunktion den Erfolg — aber zu unterschiedlichen Zeitpunkten in der Pipeline. <code class="mono">testShaderProgram</code> fragt die GPU <em>nach</em> Compile <em>und</em> Link, ob es geklappt hat (Fehler landet im GL-Info-Log). <code class="mono">validate_wgsl</code> parst und typprüft mit <code class="mono">naga</code>, <em>bevor</em> die GPU den Shader je sieht, und liefert dabei einen source-span-genauen Fehler statt eines Log-Strings — plus Hot-Reload nativ über <code class="mono">notify-debouncer-mini</code>, sodass ein Fehler beim Speichern sofort sichtbar wird.</p>
   </div>
 </section>
 
@@ -550,9 +581,9 @@ shader_loader::validate_wgsl(source)?;
   <p><strong>Quellen dieser Gegenüberstellung:</strong></p>
   <ul>
     <li>Folien: <span class="mono">Grundlegendes_zu_OpenGL.pdf</span>, S. 29–45 (Dreieck, LWJGLBasisFenster, Transformationsketten, POGL)</li>
-    <li>Java: <span class="mono">kapitel01/FlaecheSchwingt.java</span>, <span class="mono">kapitel01/HintergrundUmschalten.java</span>, <span class="mono">kapitel01/POGL.java</span></li>
+    <li>Java: <span class="mono">kapitel01/FlaecheSchwingt.java</span>, <span class="mono">kapitel01/HintergrundUmschalten.java</span>, <span class="mono">kapitel01/POGL.java</span>, <span class="mono">kapitel02/ShaderUtilities.java</span></li>
     <li>GLSL: <span class="mono">shader/torusambientdiffusespecularfinal.{vs,fs}</span></li>
-    <li>Rust/WGSL: <span class="mono">src/lib.rs</span>, <span class="mono">src/camera.rs</span>, <span class="mono">src/celestial_body.rs</span>, <span class="mono">src/mesh.rs</span>, <span class="mono">src/shaders/shader.wgsl</span></li>
+    <li>Rust/WGSL: <span class="mono">src/lib.rs</span>, <span class="mono">src/camera.rs</span>, <span class="mono">src/celestial_body.rs</span>, <span class="mono">src/mesh.rs</span>, <span class="mono">src/shader_loader.rs</span>, <span class="mono">src/shaders/shader.wgsl</span></li>
   </ul>
 </footer>
 
