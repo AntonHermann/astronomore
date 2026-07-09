@@ -14,6 +14,8 @@
 | Alte Review-Findings | `claude-code-review.md` (Repo-Root) | Transkript vom Mai; teils erledigt (sim_time f64), teils offen (Maus-Delta-Akkumulation, WASM-Wireframe-Feedback, Multiplier-Untergrenze) | Gültige Findings als Issues anlegen, Datei löschen |
 | CI für Branches | — | Pages-Workflow baut nur main; Branch-Brüche (vgl. PR #18/#19) bleiben unentdeckt | Workflow mit `cargo check` (nativ + wasm32) + clippy auf alle Pushes |
 | Statusbericht & Workflow-Regeln | Branch `claude/project-status-workflow-bim869` | Dieser Branch: `docs/STATUS-2026-06-10.md`, `docs/JOURNAL.md`, CLAUDE.md-Abschnitt | Anton: lesen, ggf. anpassen, mergen |
+| UI-Zoom vor Präsentation fixen | UI-Scale-Steuerung (`src/ui.rs` / `src/lib.rs`, Tasten `[` / `]`) | Zur Laufzeit anpassbarer UI-Scale-Slider teilweise unbenutzbar, wenn man versehentlich den Slider erwischt | Erstmal auf festen Wert zurück; Git-History nach früher genutzten guten Fixwerten durchsuchen (vor Anpassbarmachung). Vorbereitung Projektpräsentation |
+| KI-Nutzungs-Reflexion für Projektpräsentation | Präsentation (Demo + Gegenüberstellung + Reflexion) | Präsentation = (a) kurze Live-Demo, (b) Gegenüberstellung (`docs/opengl-wgpu-mapping.html`, deployt), (c) knappe KI-Nutzungs-Reflexion; Ehrlichkeits-/Vertrauensgrad-Disclaimer in der Doc (Commit `a6a0b9a`) ist erster Baustein | KI-Nutzung im Projekt zusammenfassen und Einbau in die Präsentation überlegen |
 
 ## Nächste inhaltliche Schritte (aus CLAUDE.md-Phasenplan)
 
@@ -26,6 +28,6 @@
 
 | Faden | Abschluss |
 |---|---|
-| OpenGL→wgpu-Vergleichs-Doku (`docs/opengl-wgpu-mapping.html`): 8-Stufen-Pipeline-Gegenüberstellung GL11/modernes GL/wgpu mit Spec-/Stil-Etiketten | 09.07. — Commits `291172c`..`dd27dc1` auf main |
+| OpenGL→wgpu-Vergleichs-Doku (`docs/opengl-wgpu-mapping.html`): 8-Stufen-Pipeline-Gegenüberstellung GL11/modernes GL/wgpu mit Spec-/Stil-Etiketten; via GitHub Pages deployt (Workflow um `docs/`-Kopie erweitert), erreichbar unter `https://antonhermann.github.io/astronomore/docs/opengl-wgpu-mapping.html` | 09.07. — Commits `291172c`..`1a22fee` auf main |
 | WASM/WebGL2-Render-Fehler (textureSample in Conditional, UBO-Alignment, HTTP-Cache) | 31.05. — PRs #16–#19, Fixes auf main |
 | _(ältere Einträge: siehe Git-Historie bis 31.05.)_ | |
