@@ -4,6 +4,11 @@ A real-time 3D solar system simulation built with Rust and wgpu. Runs natively a
 
 All 8 planets + Moon orbit the Sun using VSOP87 astronomical ephemerides. Blinn-Phong lighting makes the day/night terminator visible on each body. Camera modes include free-flight (FPS) and per-body orbital tracking.
 
+## Live
+
+- **Simulation:** https://antonhermann.github.io/astronomore/
+- **Fixed-Function OpenGL → wgpu/WGSL comparison:** https://antonhermann.github.io/astronomore/docs/opengl-wgpu-mapping.html — a stage-by-stage walkthrough of how the Java/LWJGL fixed-function examples map onto this project's Rust/wgpu pipeline.
+
 ## Features
 
 - **10 celestial bodies** – Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus, Neptune
