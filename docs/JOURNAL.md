@@ -26,5 +26,6 @@
 
 | Faden | Abschluss |
 |---|---|
+| OpenGL→wgpu-Vergleichs-Doku (`docs/opengl-wgpu-mapping.html`): 8-Stufen-Pipeline-Gegenüberstellung GL11/modernes GL/wgpu mit Spec-/Stil-Etiketten | 09.07. — Commits `291172c`..`dd27dc1` auf main |
 | WASM/WebGL2-Render-Fehler (textureSample in Conditional, UBO-Alignment, HTTP-Cache) | 31.05. — PRs #16–#19, Fixes auf main |
 | _(ältere Einträge: siehe Git-Historie bis 31.05.)_ | |
