@@ -7,7 +7,7 @@ All 8 planets + Moon orbit the Sun using VSOP87 astronomical ephemerides. Blinn-
 ## Live
 
 - **Simulation:** https://antonhermann.github.io/astronomore/
-- **Fixed-Function OpenGL → wgpu/WGSL comparison:** https://antonhermann.github.io/astronomore/docs/opengl-wgpu-mapping.html — a stage-by-stage walkthrough of how the Java/LWJGL fixed-function examples map onto this project's Rust/wgpu pipeline.
+- **Fixed-Function OpenGL → wgpu/WGSL comparison:** https://antonhermann.github.io/astronomore/docs/opengl-wgpu-mapping.html — a stage-by-stage walkthrough of how the Java/LWJGL fixed-function examples map onto this project's Rust/wgpu pipeline. Its companion doc — [`opengl-wgpu-analysis.md`](docs/opengl-wgpu-analysis.md) — collects the research and concept backlog (presentation time, learning value, complexity) behind the comparison.
 
 ## Features
 

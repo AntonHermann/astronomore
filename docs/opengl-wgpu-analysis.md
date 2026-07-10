@@ -1,6 +1,6 @@
 # OpenGL→wgpu-Vergleich — Analyse & Konzept-Backlog
 
-> **Begleitdokument** zu [`opengl-wgpu-mapping.html`](./opengl-wgpu-mapping.html).
+> **Begleitdokument** zu [`opengl-wgpu-mapping.html`](https://antonhermann.github.io/astronomore/docs/opengl-wgpu-mapping.html).
 > Sammelt die Research-Ergebnisse zu der Vergleichs-Doku, die (Stand jetzt)
 > **bewusst NICHT** ins Artefakt selbst eingeflossen sind. Dient als
 > Entscheidungsgrundlage für die Weiterentwicklung und die Vortragsvorbereitung.
