@@ -14,6 +14,8 @@ mod shader_loader;
 mod sim;
 mod texture;
 mod ui;
+#[cfg(target_arch = "wasm32")]
+mod web_ui;
 
 pub use celestial_body::CelestialBody;
 pub use mesh::Mesh;
@@ -76,6 +78,14 @@ pub struct State {
     sim: SimState,
     camera_rig: CameraRig,
     ui: EguiLayer,
+    /// pixels-per-point currently applied to egui. Held constant while the
+    /// UI-scale slider is being dragged so the UI doesn't rescale mid-drag.
+    applied_ui_scale: f32,
+    /// True while the UI-scale slider is actively being dragged this frame.
+    ui_scale_dragging: bool,
+    /// Pending edits from the HTML overlay controls (date picker, scale slider).
+    #[cfg(target_arch = "wasm32")]
+    web_ui: web_ui::WebUiHandle,
 }
 
 impl State {
@@ -192,6 +202,22 @@ impl State {
         // ==================== egui setup ====================
         let ui_layer = ui::EguiLayer::new(device, &gpu.window, surface_format);
 
+        let mut view = ui::ViewOptions::new();
+
+        // Seed the "jump to date" fields with the simulation's current date
+        // (it starts at the real wall-clock date) instead of the epoch default,
+        // so the date input matches what is shown on screen.
+        let sim = SimState::new();
+        let (year, month, day) = orbital::jde_to_gregorian(orbital::sim_time_to_jde(sim.time));
+        view.date_input_year = year;
+        view.date_input_month = month;
+        view.date_input_day = day;
+
+        // On the web, wire up the HTML overlay controls, seeding them with the
+        // same initial date and scale egui starts from.
+        #[cfg(target_arch = "wasm32")]
+        let web_ui = web_ui::setup((year, month, day), view.ui_scale);
+
         Ok(Self {
             gpu,
             last_update: web_time::Instant::now(),
@@ -203,15 +229,19 @@ impl State {
             arrow_mesh,
             line_brightness_buffer,
             line_brightness_bind_group,
-            view: ui::ViewOptions::new(),
+            applied_ui_scale: view.ui_scale,
+            view,
             meshes,
             identity_model_bind_group,
             diffuse_texture,
             scene,
             scene_properties,
-            sim: SimState::new(),
+            sim,
             camera_rig,
             ui: ui_layer,
+            ui_scale_dragging: false,
+            #[cfg(target_arch = "wasm32")]
+            web_ui,
         })
     }
 
@@ -222,6 +252,21 @@ impl State {
 
     /// Update application state before rendering
     pub fn update(&mut self) {
+        // Apply any edits made through the HTML overlay controls this frame.
+        #[cfg(target_arch = "wasm32")]
+        {
+            let mut events = self.web_ui.borrow_mut();
+            if let Some((year, month, day)) = events.date.take() {
+                self.view.date_input_year = year;
+                self.view.date_input_month = month;
+                self.view.date_input_day = day;
+                self.sim.jump_to_date(year, month, day);
+            }
+            if let Some(scale) = events.ui_scale.take() {
+                self.view.ui_scale = scale;
+            }
+        }
+
         let now = web_time::Instant::now();
         let dt = now - self.last_update;
         self.last_frame_duration = dt;
@@ -467,7 +512,19 @@ impl State {
         };
         let prev_meridians = self.view.sphere_meridians;
         let prev_parallels = self.view.sphere_parallels;
-        let ui_scale = self.view.ui_scale;
+        // While the UI-scale slider is being dragged, hold the applied scale
+        // constant: rescaling the whole UI mid-drag moves the slider handle out
+        // from under the pointer and makes it uncontrollable. The new scale is
+        // committed once the drag ends. Keyboard `[`/`]` and other value sources
+        // apply immediately since they never set `ui_scale_dragging`.
+        let ui_scale = if self.ui_scale_dragging {
+            self.applied_ui_scale
+        } else {
+            self.view.ui_scale
+        };
+        self.applied_ui_scale = ui_scale;
+        // Set by the UI-scale slider below; written back to `self` after the pass.
+        let mut ui_scale_dragging = false;
         let sim = &mut self.sim;
         let view = &mut self.view;
         let mut cam_speed = self.camera_rig.controller.speed;
@@ -610,11 +667,21 @@ impl State {
                         egui::Slider::new(&mut view.line_brightness, 0.0..=2.0).fixed_decimals(2),
                     );
                 });
-                ui.horizontal(|ui| {
-                    ui.label("UI scale:")
-                        .on_hover_text("[ = smaller, ] = bigger");
-                    ui.add(egui::Slider::new(&mut view.ui_scale, 0.5..=4.0).fixed_decimals(2));
-                });
+                // On the web build the UI scale is driven by a toggleable HTML
+                // range slider (see `web_ui`); being outside egui it stays a
+                // fixed, reachable size even when egui is scaled to an extreme,
+                // which is the escape hatch a scaled egui slider can't provide.
+                if cfg!(not(target_arch = "wasm32")) {
+                    ui.horizontal(|ui| {
+                        ui.label("UI scale:")
+                            .on_hover_text("[ = smaller, ] = bigger");
+                        let response = ui.add(
+                            egui::Slider::new(&mut view.ui_scale, 0.5..=4.0).fixed_decimals(2),
+                        );
+                        ui_scale_dragging =
+                            response.dragged() || response.is_pointer_button_down_on();
+                    });
+                }
                 ui.horizontal(|ui| {
                     ui.label("Label size:");
                     ui.add(
@@ -889,45 +956,51 @@ impl State {
                             .max_decimals(4),
                     );
                 });
-                ui.separator();
-                ui.label("Jump to date");
-                ui.horizontal(|ui| {
-                    let y_ch = ui
-                        .add(
-                            egui::DragValue::new(&mut view.date_input_year)
-                                .range(-4712..=9999)
-                                .prefix("Y "),
-                        )
-                        .changed();
-                    let m_ch = ui
-                        .add(
-                            egui::DragValue::new(&mut view.date_input_month)
-                                .range(1u8..=12u8)
-                                .prefix("M "),
-                        )
-                        .changed();
-                    let d_ch = ui
-                        .add(
-                            egui::DragValue::new(&mut view.date_input_day)
-                                .range(1u8..=31u8)
-                                .prefix("D "),
-                        )
-                        .changed();
-                    if y_ch || m_ch || d_ch {
-                        sim.jump_to_date(
-                            view.date_input_year,
-                            view.date_input_month,
-                            view.date_input_day,
-                        );
-                    }
-                    if ui.button("Jump →").clicked() {
-                        sim.jump_to_date(
-                            view.date_input_year,
-                            view.date_input_month,
-                            view.date_input_day,
-                        );
-                    }
-                });
+                // On the web build the date is entered through a native HTML
+                // <input type="date"> overlay (see `web_ui`): it opens the
+                // mobile date picker and stays usable regardless of egui's
+                // scale. Native keeps the egui fields (physical keyboard).
+                if cfg!(not(target_arch = "wasm32")) {
+                    ui.separator();
+                    ui.label("Jump to date");
+                    ui.horizontal(|ui| {
+                        let y_ch = ui
+                            .add(
+                                egui::DragValue::new(&mut view.date_input_year)
+                                    .range(-4712..=9999)
+                                    .prefix("Y "),
+                            )
+                            .changed();
+                        let m_ch = ui
+                            .add(
+                                egui::DragValue::new(&mut view.date_input_month)
+                                    .range(1u8..=12u8)
+                                    .prefix("M "),
+                            )
+                            .changed();
+                        let d_ch = ui
+                            .add(
+                                egui::DragValue::new(&mut view.date_input_day)
+                                    .range(1u8..=31u8)
+                                    .prefix("D "),
+                            )
+                            .changed();
+                        if y_ch || m_ch || d_ch {
+                            sim.jump_to_date(
+                                view.date_input_year,
+                                view.date_input_month,
+                                view.date_input_day,
+                            );
+                        }
+                        if ui.button("Jump →").clicked() {
+                            sim.jump_to_date(
+                                view.date_input_year,
+                                view.date_input_month,
+                                view.date_input_day,
+                            );
+                        }
+                    });
+                }
             });
         let mut touch = camera::TouchInput::default();
         egui::Window::new("Navigation")
@@ -1170,6 +1243,8 @@ impl State {
                 }
             }
         }
+
+        self.ui_scale_dragging = ui_scale_dragging;
 
         self.ui
             .state

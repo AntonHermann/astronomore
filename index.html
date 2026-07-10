@@ -9,10 +9,74 @@
         html, body { overscroll-behavior: none; }
         body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; height: 100dvh; }
         canvas { display: block; width: 100vw; height: 100vh; height: 100dvh; }
+
+        /* HTML overlay controls layered over the wgpu canvas. They live in the
+           DOM (not egui) so the date field opens the native picker/keyboard and
+           the scale slider stays a fixed, reachable size at any egui scale. The
+           container is click-through; only the actual controls capture input. */
+        #web-controls {
+            position: fixed;
+            top: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+            pointer-events: none;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        #web-controls > *, #scale-panel * { pointer-events: auto; }
+
+        #web-controls input[type="date"],
+        #scale-toggle {
+            /* >=16px keeps iOS Safari from zooming the page on focus. */
+            font-size: 16px;
+            color: #eee;
+            background: rgba(26, 26, 26, 0.8);
+            border: 1px solid #444;
+            border-radius: 6px;
+        }
+        #web-controls input[type="date"] { padding: 6px 8px; }
+        #scale-toggle {
+            width: 38px;
+            height: 38px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        #scale-panel {
+            position: absolute;
+            top: 46px;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 8px 10px;
+            color: #eee;
+            font-size: 14px;
+            white-space: nowrap;
+            background: rgba(26, 26, 30, 0.9);
+            border: 1px solid #444;
+            border-radius: 6px;
+        }
+        #scale-panel.hidden { display: none; }
+        #scale-panel input[type="range"] { width: 170px; }
     </style>
 </head>
 <body>
     <canvas id="canvas"></canvas>
+
+    <div id="web-controls">
+        <input type="date" id="date-input" min="1900-01-01" max="2100-12-31"
+               title="Jump to date" aria-label="Jump to date">
+        <button type="button" id="scale-toggle" title="UI scale">⚙</button>
+        <div id="scale-panel" class="hidden">
+            <label for="scale-input">UI scale: <span id="scale-value">2.00</span>×</label>
+            <input type="range" id="scale-input" min="0.5" max="4" step="0.05">
+        </div>
+    </div>
+
     <script type="module">
         import init from "./pkg/astronomore.js";
         await init();
