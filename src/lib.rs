@@ -523,6 +523,16 @@ impl State {
         let raw_input = self.ui.state.take_egui_input(&self.gpu.window);
         self.ui.ctx.set_pixels_per_point(ui_scale);
         self.ui.ctx.begin_pass(raw_input);
+        egui::Area::new(egui::Id::new("repo_url"))
+            .anchor(egui::Align2::LEFT_TOP, egui::Vec2::new(8.0, 8.0))
+            .interactable(false)
+            .show(&self.ui.ctx, |ui| {
+                ui.label(
+                    egui::RichText::new("github.com/AntonHermann/astronomore")
+                        .color(egui::Color32::from_gray(160))
+                        .size(24.0),
+                );
+            });
         egui::Window::new("Simulation")
             .resizable(false)
             .anchor(egui::Align2::RIGHT_TOP, egui::Vec2::new(-8.0, 8.0))
