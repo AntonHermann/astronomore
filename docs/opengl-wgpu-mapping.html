@@ -434,7 +434,7 @@ glfwTerminate();</code></pre>
       <p class="gl-note"><strong>Kein Fortschritt hier:</strong> Moderne Desktop-GL-Tutorials (GLFW/SDL) nutzen strukturell dieselbe App-eigene <code class="mono">while</code>-Schleife wie das Dino-Buch — nur der Fenster-Layer ist ausgetauscht. Der Sprung "App besitzt die Schleife" → "Bibliothek besitzt die Schleife" ist spezifisch der wgpu/winit-Schnitt, keine Konsequenz aus Shadern oder Core-Profile.</p>
     </details>
     <div class="panel modern">
-      <div class="panel-tag mono"><span class="tag-source">lib.rs:1519, 1446, 296<span class="badge stil" title="Wahl der Fenster-Bibliothek winit — nicht von wgpu selbst vorgeschrieben.">Stil · winit</span></span><b>run_app() — Schleife in winit, wir nur Callback</b></div>
+      <div class="panel-tag mono"><span class="tag-source">lib.rs:1546, 1473, 296<span class="badge stil" title="Wahl der Fenster-Bibliothek winit — nicht von wgpu selbst vorgeschrieben.">Stil · winit</span></span><b>run_app() — Schleife in winit, wir nur Callback</b></div>
       <pre class="mono"><code><span class="cm">// run() — DIES ist die eigentliche Schleife,</span>
 <span class="cm">// nur gehoert sie winit statt uns:</span>
 event_loop.run_app(&amp;<span class="kw teal">mut</span> app)?;   <span class="cm">// blockiert hier</span>
@@ -548,11 +548,12 @@ glEnableVertexAttribArray(0);
 <span class="cm">// pro Frame, nur noch binden + zeichnen:</span>
 glBindVertexArray(VAO);
 glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, 0);</code></pre>
-      <p class="gl-note"><strong>Hier konvergiert es:</strong> VAO/VBO/EBO sind praktisch dieselbe Architektur wie Vertex-/Index-Buffer in wgpu — einmal hochladen, pro Frame nur binden. Der Immediate-Mode → Buffer-Sprung ist der eigentliche "moderne" Schnitt in der GPU-Programmierung insgesamt, nicht etwas, das erst mit wgpu kommt. Nur die Typsicherheit (Layout wird zur Compile-Zeit geprüft statt per <code class="mono">glVertexAttribPointer</code>-Offset von Hand) ist wgpu-spezifisch.</p>
+      <p class="gl-note"><strong>Hier konvergiert es:</strong> VAO/VBO/EBO sind praktisch dieselbe Architektur wie Vertex-/Index-Buffer in wgpu — einmal hochladen, pro Frame nur binden. Der Immediate-Mode → Buffer-Sprung ist der eigentliche "moderne" Schnitt in der GPU-Programmierung insgesamt, nicht etwas, das erst mit wgpu kommt. Nur die Absicherung ist wgpu-spezifisch: das Vertex-Layout wird zwar auch dort von Hand beschrieben (<code class="mono">VertexBufferLayout</code> mit Offsets, wie <code class="mono">glVertexAttribPointer</code>), aber wgpu validiert es schon beim Erstellen der Pipeline gegen den Shader — statt wie GL einen Layout-Fehler erst beim Zeichnen als stilles Fehlverhalten durchzulassen.</p>
     </details>
     <div class="panel modern">
-      <div class="panel-tag mono"><span class="tag-source">mesh.rs:123 · celestial_body.rs:204–216<span class="badge spec" title="Buffer-basiertes Zeichnen ist inhärent im wgpu-Design — es gibt keinen Immediate-Mode-Modus.">Spec · wgpu</span></span><b>einmalig hochladen, pro Frame nur binden</b></div>
-      <pre class="mono"><code><span class="cm">// einmalig, beim Erzeugen des Körpers (mesh.rs:123):</span>
+      <div class="panel-tag mono"><span class="tag-source">mesh.rs:123 · celestial_body.rs:76, 204–216<span class="badge spec" title="Buffer-basiertes Zeichnen ist inhärent im wgpu-Design — es gibt keinen Immediate-Mode-Modus.">Spec · wgpu</span></span><b>einmalig hochladen, pro Frame nur binden</b></div>
+      <pre class="mono"><code><span class="cm">// einmalig, beim Erzeugen des Körpers (celestial_body.rs:76;</span>
+<span class="cm">// die Tessellierung selbst lebt in mesh.rs:123):</span>
 <span class="kw teal">let</span> mesh = Mesh::sphere(device, 128, 64);
 <span class="cm">// -&gt; vertex_buffer, index_buffer liegen ab jetzt auf der GPU</span>
 
@@ -645,7 +646,7 @@ self.view_proj = (proj * view).to_cols_array_2d();
   <p class="stage-prose">Die Torus-Shader nutzen GLSL-Built-ins, die im Fixed-Function-Kontext "einfach da sind" — <code class="mono">gl_ModelViewProjectionMatrix</code>, <code class="mono">gl_Normal</code>. Sie sind nur deshalb befüllt, weil der CPU-Code aus Stufe 4 genau diesen Matrix-Stack (<code class="mono">glLoadIdentity</code>/<code class="mono">glFrustum</code>/...) bespielt — die Built-ins sind also eine direkte Konsequenz der Stack-Wahl, kein separates Feature. WGSL kennt so etwas nicht: jede Matrix, jeder Wert muss über eine <code class="mono">struct</code> deklariert und einer Bind Group zugeordnet werden.</p>
   <div class="compare">
     <div class="panel legacy">
-      <div class="panel-tag mono"><span class="tag-source">torusambientdiffusespecularfinal.vs<span class="badge spec" title="gl_ModelViewProjectionMatrix &amp; co. existieren nur unter #version 130 (Compatibility); im Core-Profile (#version 150 core+) entfernt.">Spec · Compat-GLSL</span></span><b>implizite Built-ins</b></div>
+      <div class="panel-tag mono"><span class="tag-source">torusambientdiffusespecularfinal.vs<span class="badge spec" title="gl_ModelViewProjectionMatrix &amp; co. gehören zum Compatibility-GLSL: vorhanden bis GLSL 1.30 und in allen späteren Compatibility-Profilen; im Core-Profile entfernt.">Spec · Compat-GLSL</span></span><b>implizite Built-ins</b></div>
       <pre class="mono"><code>#version 130
 <span class="kw amber">uniform float</span> ambient, diffuseWeight, specularWeight;
 <span class="kw amber">uniform vec3</span> lightDirection;
