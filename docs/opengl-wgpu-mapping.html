@@ -224,6 +224,14 @@
   @media (max-width: 900px) {
     .compare { grid-template-columns: 1fr; }
   }
+  /* eingeklappte mittlere Spalte auf eine schmale, inhaltsbreite Kachel
+     schrumpfen — gilt bewusst erst ab Desktop-Breite, damit die
+     Mobile-Einspaltenregel oben nicht überstimmt wird */
+  @media (min-width: 901px) {
+    .compare:has(.modern-gl:not([open])) {
+      grid-template-columns: 1fr minmax(4.5rem, 7.5rem) 1fr;
+    }
+  }
 
   .panel {
     background: var(--panel);
@@ -274,6 +282,37 @@
     outline: 2px solid var(--steel);
     outline-offset: -2px;
   }
+  /* eingeklappt: nur den Ähnlichkeits-Hinweis behalten, Quellname + Badge
+     ausblenden. Ein farbiger Pfeil (amber = linke/Legacy-Spalte,
+     teal = rechte/wgpu-Spalte) zeigt die Verwandtschaft auf einen Blick. */
+  .panel.modern-gl:not([open]) > summary {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 0.15rem;
+    padding: 0.7rem 0.45rem;
+  }
+  .panel.modern-gl:not([open]) > summary::before { display: none; }
+  .panel.modern-gl:not([open]) > summary:hover { background: var(--steel-soft); }
+  .panel.modern-gl:not([open]) > summary .tag-source,
+  .panel.modern-gl:not([open]) > summary .dir { display: none; }
+  .panel.modern-gl:not([open]) > summary b {
+    font-weight: 600;
+    font-size: 0.68rem;
+    line-height: 1.3;
+    color: var(--muted);
+  }
+  .panel.modern-gl:not([open]) > summary .sim-left::before,
+  .panel.modern-gl:not([open]) > summary .sim-right::before {
+    display: block;
+    font-size: 1.85rem;
+    font-weight: 700;
+    line-height: 0.9;
+    margin-bottom: 0.1rem;
+  }
+  .panel.modern-gl:not([open]) > summary .sim-left::before { content: "←"; color: var(--amber); }
+  .panel.modern-gl:not([open]) > summary .sim-right::before { content: "→"; color: var(--teal); }
   .panel.modern-gl .gl-note {
     margin: 0;
     padding: 0 0.9rem 0.9rem;
@@ -418,7 +457,7 @@ Display.destroy();
 }</code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span class="tag-source">GLFW · kein Vorlagen-Bezug<span class="badge stil" title="Wahl der Fenster-Bibliothek GLFW — nicht von OpenGL selbst vorgeschrieben.">Stil · GLFW</span></span><b>gleiche Architektur wie links</b></summary>
+      <summary class="mono"><span class="tag-source">GLFW · kein Vorlagen-Bezug<span class="badge stil" title="Wahl der Fenster-Bibliothek GLFW — nicht von OpenGL selbst vorgeschrieben.">Stil · GLFW</span></span><b class="sim-left">gleiche Architektur <span class="dir">wie links</span></b></summary>
       <pre class="mono"><code>GLFWwindow* window = glfwCreateWindow(800, 600, "GL", 0, 0);
 glfwMakeContextCurrent(window);
 gladLoadGLLoader(...);  <span class="cm">// Funktionszeiger laden —</span>
@@ -480,7 +519,7 @@ self.gpu.window.request_redraw();
 }</code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span class="tag-source">GL 3.3 Core · kein Vorlagen-Bezug<span class="badge spec" title="Unverändert seit GL 1.0, auch im Core-Profile.">Spec · GL 1.0+</span></span><b>unverändert zu links</b></summary>
+      <summary class="mono"><span class="tag-source">GL 3.3 Core · kein Vorlagen-Bezug<span class="badge spec" title="Unverändert seit GL 1.0, auch im Core-Profile.">Spec · GL 1.0+</span></span><b class="sim-left">unverändert <span class="dir">zu links</span></b></summary>
       <pre class="mono"><code>glClearColor(0.95f, 0.95f, 0.95f, 1.0f);
 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 <span class="cm">// meist mit Tiefenpuffer kombiniert, aber sonst</span>
@@ -530,7 +569,7 @@ depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
 glEnd();</code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span class="tag-source">GL 3.3 Core · kein Vorlagen-Bezug<span class="badge spec" title="VAOs sind im Core-Profile (3.2+) zwingend, um überhaupt zeichnen zu können.">Spec · Core-Profile</span></span><b>fast wie rechts</b></summary>
+      <summary class="mono"><span class="tag-source">GL 3.3 Core · kein Vorlagen-Bezug<span class="badge spec" title="VAOs sind im Core-Profile (3.2+) zwingend, um überhaupt zeichnen zu können.">Spec · Core-Profile</span></span><b class="sim-right">fast <span class="dir">wie rechts</span></b></summary>
       <pre class="mono"><code><span class="cm">// einmalig:</span>
 <span class="kw steel">unsigned int</span> VAO, VBO, EBO;
 glGenVertexArrays(1, &amp;VAO);
@@ -599,7 +638,7 @@ glScaled(0.8, 0.8, 0.8);                <span class="cm">// M = M*S</span>
 POGL.renderViereck();  <span class="cm">// v' = M*v = P*(T*R*S)*v, pro Vertex</span></code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span class="tag-source">GLM · kein Vorlagen-Bezug<span class="badge stil" title="GLM ist eine Drittanbieter-Mathebibliothek, nicht Teil der OpenGL-Spec — genau wie glam für wgpu.">Stil · GLM (3rd-party)</span></span><b>fast wie rechts</b></summary>
+      <summary class="mono"><span class="tag-source">GLM · kein Vorlagen-Bezug<span class="badge stil" title="GLM ist eine Drittanbieter-Mathebibliothek, nicht Teil der OpenGL-Spec — genau wie glam für wgpu.">Stil · GLM (3rd-party)</span></span><b class="sim-right">fast <span class="dir">wie rechts</span></b></summary>
       <pre class="mono"><code><span class="cm">// Stack faellt im Core-Profile komplett weg —</span>
 <span class="cm">// glLoadIdentity/glFrustum/glTranslate sind deprecated.</span>
 <span class="cm">// Stattdessen CPU-seitige Matrizen (hier: GLM):</span>
@@ -658,7 +697,7 @@ self.view_proj = (proj * view).to_cols_array_2d();
 }</code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span class="tag-source">GLSL 330 core · kein Vorlagen-Bezug<span class="badge spec" title="gl_ModelViewProjectionMatrix &amp; co. sind im Core-Profile entfernt — explizite in/uniform-Deklaration ist Pflicht.">Spec · GLSL 330 core</span></span><b>fast wie rechts</b></summary>
+      <summary class="mono"><span class="tag-source">GLSL 330 core · kein Vorlagen-Bezug<span class="badge spec" title="gl_ModelViewProjectionMatrix &amp; co. sind im Core-Profile entfernt — explizite in/uniform-Deklaration ist Pflicht.">Spec · GLSL 330 core</span></span><b class="sim-right">fast <span class="dir">wie rechts</span></b></summary>
       <pre class="mono"><code>#version 330 core
 <span class="kw steel">layout</span>(location=0) <span class="kw steel">in</span> vec3 aPos;
 <span class="kw steel">layout</span>(location=1) <span class="kw steel">in</span> vec2 aTexCoord;
@@ -712,7 +751,7 @@ color = vec4(1) * (ambient + diffuse*diffuseWeight
 <span class="cm">// -&gt; als "flat" color interpoliert, .fs gibt sie nur aus</span></code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span class="tag-source">GLSL 330 core · kein Vorlagen-Bezug<span class="badge stil" title="Fragment-Lighting ist Community-Konvention (LearnOpenGL & Co.), nicht von GLSL 330 vorgeschrieben — Vertex-Lighting kompiliert genauso im Core-Profile.">Stil · Konvention</span></span><b>fast wie rechts</b></summary>
+      <summary class="mono"><span class="tag-source">GLSL 330 core · kein Vorlagen-Bezug<span class="badge stil" title="Fragment-Lighting ist Community-Konvention (LearnOpenGL & Co.), nicht von GLSL 330 vorgeschrieben — Vertex-Lighting kompiliert genauso im Core-Profile.">Stil · Konvention</span></span><b class="sim-right">fast <span class="dir">wie rechts</span></b></summary>
       <pre class="mono"><code><span class="cm">// im Fragment-Shader (Standard seit LearnOpenGL &amp; co.):</span>
 vec3 N = normalize(Normal);
 vec3 L = normalize(lightPos - FragPos);
@@ -761,7 +800,7 @@ glBegin(GL_TRIANGLES);
 glEnd();</code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span class="tag-source">GLSL 330 core · kein Vorlagen-Bezug<span class="badge spec" title="texture() als Funktion ersetzt glColor3d als State-Mechanismus — das ist GLSL-330-Sprachdesign, nicht Beispiel-Stil.">Spec · GLSL 330</span></span><b>fast wie rechts</b></summary>
+      <summary class="mono"><span class="tag-source">GLSL 330 core · kein Vorlagen-Bezug<span class="badge spec" title="texture() als Funktion ersetzt glColor3d als State-Mechanismus — das ist GLSL-330-Sprachdesign, nicht Beispiel-Stil.">Spec · GLSL 330</span></span><b class="sim-right">fast <span class="dir">wie rechts</span></b></summary>
       <pre class="mono"><code><span class="kw steel">uniform</span> sampler2D diffuseTex;
 <span class="kw steel">uniform</span> <span class="kw steel">bool</span> useTexture;
 <span class="kw steel">uniform</span> vec3 flatColor;
@@ -807,7 +846,7 @@ vec3 baseColor = useTexture
 }</code></pre>
     </div>
     <details class="panel modern-gl">
-      <summary class="mono"><span class="tag-source">GL 3.3 Core · kein Vorlagen-Bezug<span class="badge spec" title="Identische API zur linken Spalte — glCreateShader/glCompileShader/InfoLog seit GL 2.0 unverändert.">Spec · GL-Shader-API (seit 2.0)</span></span><b>gleiche Fehlerkategorie wie links</b></summary>
+      <summary class="mono"><span class="tag-source">GL 3.3 Core · kein Vorlagen-Bezug<span class="badge spec" title="Identische API zur linken Spalte — glCreateShader/glCompileShader/InfoLog seit GL 2.0 unverändert.">Spec · GL-Shader-API (seit 2.0)</span></span><b class="sim-left">gleiche Fehlerkategorie <span class="dir">wie links</span></b></summary>
       <pre class="mono"><code><span class="kw steel">unsigned int</span> vs = glCreateShader(GL_VERTEX_SHADER);
 glShaderSource(vs, 1, &amp;src, 0);
 glCompileShader(vs);
