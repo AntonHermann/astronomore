@@ -527,6 +527,33 @@ impl State {
             .resizable(false)
             .anchor(egui::Align2::RIGHT_TOP, egui::Vec2::new(-8.0, 8.0))
             .show(&self.ui.ctx, |ui| {
+                if ui
+                    .button("Demo preset")
+                    .on_hover_text(
+                        "Low tessellation, faster time, debug overlays off, orbit camera on Earth",
+                    )
+                    .clicked()
+                {
+                    view.wireframe = false;
+                    view.show_normals = false;
+                    view.show_grid_xz = false;
+                    view.show_grid_xy = false;
+                    view.show_grid_yz = false;
+                    view.show_arrows = false;
+                    view.show_offscreen_indicators = false;
+                    view.show_body_names = true;
+                    view.sphere_meridians = 8;
+                    view.sphere_parallels = 4;
+                    sim.set_sim_days_per_sec(0.02);
+                    sim.is_paused = false;
+                    selected_is_fps = false;
+                    selected_target = body_list[SolarSystemBody::Earth as usize].0;
+                    orbit_dist = 3.5;
+                    orbit_yaw_deg = 0.0;
+                    orbit_pitch_deg = 20.0;
+                    reset_camera = true;
+                }
+                ui.separator();
                 ui.horizontal(|ui| {
                     let wireframe_label = if view.wireframe {
                         "Wireframe: on"
