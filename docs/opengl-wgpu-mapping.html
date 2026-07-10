@@ -62,8 +62,11 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  html { scroll-behavior: smooth; }
+
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
+    html { scroll-behavior: auto; }
   }
 
   .mono {
@@ -188,6 +191,7 @@
   section.stage {
     margin: 3.6rem 0;
     max-width: 900px;
+    scroll-margin-top: 3.6rem;
   }
   section.stage:has(.compare) { max-width: none; }
   section.stage:first-of-type { margin-top: 0; }
@@ -390,6 +394,63 @@
   .disclaimer .trust-high { color: var(--teal); font-weight: 600; }
   .disclaimer .trust-low { color: var(--amber); font-weight: 600; }
 
+  /* -- sticky pipeline outline: docks at the viewport top; a scroll-spy
+     highlights the stage currently in view, a click jumps to it -- */
+  .pipeline-nav {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    overflow-x: auto;
+    margin: 0 0 3.2rem;
+    padding: 0.5rem 0.4rem;
+    background: var(--bg);
+    border-bottom: 1px solid var(--rule);
+    scrollbar-width: none;
+  }
+  .pipeline-nav::-webkit-scrollbar { display: none; }
+  .pipeline-nav .pn-title {
+    flex: none;
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 0.7rem 0 0.35rem;
+    white-space: nowrap;
+  }
+  .pipeline-nav a {
+    flex: none;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35em;
+    padding: 0.28rem 0.5rem;
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 0.72rem;
+    white-space: nowrap;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .pipeline-nav a .pn-num { font-weight: 700; letter-spacing: 0.02em; }
+  .pipeline-nav a:hover { color: var(--text); background: var(--panel); }
+  .pipeline-nav a:focus-visible {
+    outline: 2px solid var(--steel);
+    outline-offset: 1px;
+  }
+  .pipeline-nav a.active { color: var(--text); background: var(--panel); }
+  .pipeline-nav a.active .pn-num {
+    background: linear-gradient(90deg, var(--amber), var(--teal));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  @media (max-width: 720px) {
+    .pipeline-nav .pn-title,
+    .pipeline-nav a .pn-label { display: none; }
+  }
+
   footer {
     max-width: 900px;
     margin-top: 4rem;
@@ -433,7 +494,19 @@
   <p>Auch die <strong>Spec-/Stil-Einordnungen und die „Kernunterschied"-Erklärtexte sind überwiegend KI-formuliert und nicht durchgängig gegengeprüft.</strong> Wo etwas für eine Prüfung oder Präsentation zählt, gilt: erst an der Primärquelle (Spec, Buch, echter Code) nachschlagen. Diese Offenlegung ist bewusster Teil meiner Reflexion zur KI-Nutzung im Projekt.</p>
 </div>
 
-<section class="stage">
+<nav class="pipeline-nav mono" aria-label="Pipeline-Stufen">
+  <span class="pn-title">Pipeline</span>
+  <a href="#stage-01" title="Fenster &amp; Render-Loop"><span class="pn-num">01</span> <span class="pn-label">Loop</span></a>
+  <a href="#stage-02" title="Bildschirm löschen"><span class="pn-num">02</span> <span class="pn-label">Clear</span></a>
+  <a href="#stage-03" title="Geometrie zeichnen"><span class="pn-num">03</span> <span class="pn-label">Geometrie</span></a>
+  <a href="#stage-04" title="Transformationskette"><span class="pn-num">04</span> <span class="pn-label">Transform</span></a>
+  <a href="#stage-05" title="Daten in den Shader bringen"><span class="pn-num">05</span> <span class="pn-label">Daten</span></a>
+  <a href="#stage-06" title="Beleuchtung"><span class="pn-num">06</span> <span class="pn-label">Licht</span></a>
+  <a href="#stage-07" title="Material: Farbe oder Textur"><span class="pn-num">07</span> <span class="pn-label">Material</span></a>
+  <a href="#stage-08" title="Shader laden"><span class="pn-num">08</span> <span class="pn-label">Shader</span></a>
+</nav>
+
+<section class="stage" id="stage-01">
   <p class="stage-label mono"><span class="n">01</span> · fenster &amp; render-loop</p>
   <h2>Wer ruft eigentlich einen Frame auf?</h2>
   <p class="stage-prose">Beide haben eine blockierende Schleife irgendwo — die Frage ist nur, <em>wer sie besitzt</em>. Im Dino-Buch schreibt die App die <code class="mono">while</code>-Schleife selbst und ruft explizit alles auf: Zeitmessung, Zeichnen, Buffer-Swap. Bei winit gehört die Schleife der Bibliothek (<code class="mono">event_loop.run_app()</code>); unser Code sitzt nur noch als Callback <code class="mono">window_event()</code> darin und bekommt einen Frame zugeteilt, wenn winit einen für fällig hält.</p>
@@ -505,7 +578,7 @@ self.gpu.window.request_redraw();
   </div>
 </section>
 
-<section class="stage">
+<section class="stage" id="stage-02">
   <p class="stage-label mono"><span class="n">02</span> · bildschirm löschen</p>
   <h2>Clear-Color: Befehl vs. Deklaration</h2>
   <p class="stage-prose">POGL bündelt zwei State-Machine-Aufrufe zu einer Hilfsfunktion. In wgpu ist "löschen" kein Befehl mehr, den man mittendrin ausführt, sondern eine Eigenschaft, die man beim Eröffnen des Render-Passes deklariert.</p>
@@ -553,7 +626,7 @@ depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
   </div>
 </section>
 
-<section class="stage">
+<section class="stage" id="stage-03">
   <p class="stage-label mono"><span class="n">03</span> · geometrie zeichnen</p>
   <h2>Immediate Mode vs. Vertex/Index-Buffer</h2>
   <p class="stage-prose">Das ist der größte architektonische Sprung im ganzen Vergleich. <code class="mono">glBegin</code>/<code class="mono">glVertex</code>/<code class="mono">glEnd</code> schickt bei <em>jedem einzelnen Frame</em> jeden Vertex einzeln über den Treiber zur GPU. wgpu lädt die Geometrie <em>einmalig</em> auf die GPU und referenziert sie danach nur noch.</p>
@@ -611,7 +684,7 @@ self.draw_indexed(0..cb.mesh.num_elements, 0, instances);</code></pre>
   </div>
 </section>
 
-<section class="stage">
+<section class="stage" id="stage-04">
   <p class="stage-label mono"><span class="n">04</span> · transformationskette</p>
   <h2>M = I · P · T · R · S — Stack vs. Ausdruck</h2>
   <p class="stage-prose">Folie 41/42 zeigt die Kette <code class="mono">M=I; M*P; M*T; M*R; M*S</code> als flache Folge mutierender Aufrufe auf einem globalen Matrix-Stack. Um sie mit der rechten Seite vergleichbar zu machen, wird sie hier <em>nicht</em> in der Reihenfolge der Folie abgetippt, sondern nach denselben drei Rollen umsortiert, die astronomore explizit benennt: Projektion, View, Modell.</p>
@@ -679,7 +752,7 @@ self.view_proj = (proj * view).to_cols_array_2d();
   </div>
 </section>
 
-<section class="stage">
+<section class="stage" id="stage-05">
   <p class="stage-label mono"><span class="n">05</span> · daten in den shader bringen</p>
   <h2>Built-ins vs. explizite Bind Groups</h2>
   <p class="stage-prose">Die Torus-Shader nutzen GLSL-Built-ins, die im Fixed-Function-Kontext "einfach da sind" — <code class="mono">gl_ModelViewProjectionMatrix</code>, <code class="mono">gl_Normal</code>. Sie sind nur deshalb befüllt, weil der CPU-Code aus Stufe 4 genau diesen Matrix-Stack (<code class="mono">glLoadIdentity</code>/<code class="mono">glFrustum</code>/...) bespielt — die Built-ins sind also eine direkte Konsequenz der Stack-Wahl, kein separates Feature. WGSL kennt so etwas nicht: jede Matrix, jeder Wert muss über eine <code class="mono">struct</code> deklariert und einer Bind Group zugeordnet werden.</p>
@@ -732,7 +805,7 @@ self.view_proj = (proj * view).to_cols_array_2d();
   </div>
 </section>
 
-<section class="stage">
+<section class="stage" id="stage-06">
   <p class="stage-label mono"><span class="n">06</span> · beleuchtung</p>
   <h2>Per-Vertex-Phong vs. Per-Fragment-Blinn-Phong</h2>
   <p class="stage-prose">Beide Beispiele rechnen ambient + diffus + spekular. Der Torus-Shader tut das pro <em>Vertex</em> und interpoliert die fertige Farbe über das Dreieck (Gouraud-Shading) — sichtbar an den Facetten bei grober Tessellierung. astronomore rechnet pro <em>Fragment</em> und nutzt den Blinn-Phong-Halfway-Vektor statt <code class="mono">reflect()</code>.</p>
@@ -783,7 +856,7 @@ FragColor = vec4(ambient + diff*diffuseColor
   </div>
 </section>
 
-<section class="stage">
+<section class="stage" id="stage-07">
   <p class="stage-label mono"><span class="n">07</span> · material: farbe oder textur</p>
   <h2>glColor3d als globaler State vs. Uniform-Flag</h2>
   <p class="stage-prose">Immediate Mode setzt die aktuelle Zeichenfarbe als globalen State, der für alle folgenden <code class="mono">glVertex</code>-Aufrufe gilt, bis er erneut geändert wird. astronomore trifft dieselbe Entscheidung (Textur oder Flachfarbe) pro Fragment über ein Uniform-Flag.</p>
@@ -826,7 +899,7 @@ vec3 baseColor = useTexture
   </div>
 </section>
 
-<section class="stage">
+<section class="stage" id="stage-08">
   <p class="stage-label mono"><span class="n">08</span> · shader laden</p>
   <h2>.vs/.fs-Dateipaare vs. eine validierte .wgsl-Datei</h2>
   <p class="stage-prose">Kapitel 2 trennt Vertex- und Fragment-Shader in eigene Dateien (<code class="mono">torus*.vs</code> / <code class="mono">torus*.fs</code>). <code class="mono">ShaderUtilities.java</code> liest davon nur den Text ein und prüft <em>nach</em> dem Linken den Erfolg über einen GL-Info-Log — das eigentliche <code class="mono">glCompileShader</code>/<code class="mono">glLinkProgram</code> passiert in den jeweiligen Beispiel-Klassen selbst (hier nicht gezeigt). Dass es überhaupt zwei getrennte Helfer-Funktionen sind (<code class="mono">readShadercode</code>, <code class="mono">testShaderProgram</code>), ist Buch-eigene Code-Organisation — die GL-Aufrufe selbst sind seit GL 2.0 unverändert. astronomore validiert dagegen <em>vor</em> der GPU, mit exakter Fehlerposition im Quelltext.</p>
@@ -888,5 +961,42 @@ glGetProgramiv(prog, GL_LINK_STATUS, &amp;ok);</code></pre>
   </ul>
   <p><strong>Begleitdokument:</strong> <a href="https://github.com/AntonHermann/astronomore/blob/main/docs/opengl-wgpu-analysis.md">opengl-wgpu-analysis.md</a> sammelt weiterführende Analysen (Präsentationszeit, Lernwert, Komplexität, Interaktions-Ideen) zu dieser Gegenüberstellung, die bewusst (noch) nicht in dieses Artefakt eingeflossen sind.</p>
 </footer>
+
+<script>
+  (function () {
+    var nav = document.querySelector('.pipeline-nav');
+    if (!nav) return;
+    var links = Array.prototype.slice.call(nav.querySelectorAll('a[href^="#stage-"]'));
+    var sections = Array.prototype.slice.call(document.querySelectorAll('section.stage[id]'));
+    if (!sections.length || !('IntersectionObserver' in window)) return;
+
+    var current = null;
+    function setActive(id) {
+      if (id === current) return;
+      current = id;
+      links.forEach(function (a) {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+      });
+    }
+
+    var visible = Object.create(null);
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        visible[e.target.id] = e.isIntersecting;
+      });
+      // Of the sections crossing the band just below the sticky bar,
+      // the topmost one is the section the reader is currently in.
+      var best = null, bestTop = Infinity;
+      sections.forEach(function (s) {
+        if (!visible[s.id]) return;
+        var top = s.getBoundingClientRect().top;
+        if (top < bestTop) { bestTop = top; best = s.id; }
+      });
+      if (best) setActive(best);
+    }, { rootMargin: '-18% 0px -72% 0px', threshold: 0 });
+
+    sections.forEach(function (s) { observer.observe(s); });
+  })();
+</script>
 
 </div>
