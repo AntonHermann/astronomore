@@ -5,3 +5,5 @@ scripts/__marimo__/
 # perf/
 perf/bench-report.*
 perf/plots/
+# Copyrighted university lecture slides - see docs/vl_slides.md
+/docs/vl_slides/

@@ -17,6 +17,7 @@
 - **Fehlerbehandlung:** miette
 - **Zeit:** web-time (nativ + WASM kompatibel)
 - **Parallelreferenz:** Java/LWJGL-Projekt (Buch: "Beleuchtung und Rendering", 3. Auflage)
+- **VL-Folien:** liegen aus Urheberrechtsgründen nicht in diesem öffentlichen Repo, siehe `docs/vl_slides.md`
 
 ## Bereits umgesetzt
 
