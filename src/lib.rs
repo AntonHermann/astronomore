@@ -641,6 +641,12 @@ impl State {
                     ui.label("UI scale:")
                         .on_hover_text("[ = smaller, ] = bigger");
                     ui.add(egui::Slider::new(&mut view.ui_scale, 0.5..=4.0).fixed_decimals(2));
+                    if ui.button("−").clicked() {
+                        view.ui_scale = (view.ui_scale - 0.05).max(0.5);
+                    }
+                    if ui.button("+").clicked() {
+                        view.ui_scale = (view.ui_scale + 0.05).min(4.0);
+                    }
                 });
                 ui.horizontal(|ui| {
                     ui.label("Label size:");

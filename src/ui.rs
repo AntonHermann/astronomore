@@ -71,7 +71,7 @@ impl ViewOptions {
             background_color: [0.0, 0.0, 0.0],
             show_offscreen_indicators: true,
             line_brightness: 0.1,
-            ui_scale: 2.0,
+            ui_scale: 1.2,
             label_font_size: 14.0,
             offscreen_label_font_size: 20.0,
         }
